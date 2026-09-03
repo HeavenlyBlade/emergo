@@ -1,0 +1,25 @@
+# EAS Build archive exclusions
+# Prevents EAS from picking up files outside the mobile project directory
+
+node_modules/
+.expo/
+dist/
+web-build/
+android/
+ios/
+.git/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+*.pem
+.env*.local
+*.tsbuildinfo
+.metro-health-check*
+.kotlin/
