@@ -23,6 +23,7 @@
     },
     "android": {
       "package": "com.emergo.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#D32F2F",
         "foregroundImage": "./assets/android-icon-foreground.png",
