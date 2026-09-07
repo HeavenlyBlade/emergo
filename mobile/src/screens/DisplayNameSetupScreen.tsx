@@ -1,9 +1,8 @@
 /**
  * DisplayNameSetupScreen
  *
- * Shown once after first login when the user has no display name yet.
- * Collects the user's name and saves it to users/{uid}.displayName.
- * After saving, the root navigator redirects to the main app automatically.
+ * Shown once after first login when the user has no display name.
+ * Saves the name to Firestore, then calls onAuthSuccess to redirect to Home.
  */
 
 import { useState } from 'react';
@@ -17,10 +16,13 @@ import {
   TextInput,
   TouchableOpacity,
 } from 'react-native';
-import { getAuth } from '@react-native-firebase/auth';
-import { saveDisplayName } from '../services/authService';
+import { getStoredSession, saveDisplayName } from '../services/authService';
 
-export default function DisplayNameSetupScreen() {
+type Props = {
+  onAuthSuccess: () => void;
+};
+
+export default function DisplayNameSetupScreen({ onAuthSuccess }: Props) {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -31,22 +33,14 @@ export default function DisplayNameSetupScreen() {
       return;
     }
 
-    const uid = getAuth().currentUser?.uid;
-    if (!uid) {
-      Alert.alert('Error', 'No user session found. Please log in again.');
-      return;
-    }
-
     setLoading(true);
     try {
+      const uid = await getStoredSession();
+      if (!uid) throw new Error('No session found. Please log in again.');
       await saveDisplayName(uid, trimmed);
-      // useAuth hook will pick up the updated displayName and
-      // the root navigator will redirect to Home automatically
+      onAuthSuccess();
     } catch (error: any) {
-      Alert.alert(
-        'Could not save name',
-        error?.message ?? 'Please try again.'
-      );
+      Alert.alert('Could not save name', error?.message ?? 'Please try again.');
     } finally {
       setLoading(false);
     }
@@ -99,20 +93,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     gap: 14,
   },
-  logo: {
-    fontSize: 52,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#111',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  logo: { fontSize: 52 },
+  title: { fontSize: 26, fontWeight: '700', color: '#111' },
+  subtitle: { fontSize: 14, color: '#666', textAlign: 'center', lineHeight: 20 },
   input: {
     width: '100%',
     height: 52,
@@ -131,12 +114,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  buttonDisabled: { opacity: 0.6 },
+  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

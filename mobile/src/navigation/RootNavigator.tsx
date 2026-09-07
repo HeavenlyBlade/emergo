@@ -1,11 +1,12 @@
 /**
  * RootNavigator
  *
- * Watches auth state via useAuth and renders either:
- *   - AuthStack (PhoneEntry → OtpVerify → DisplayNameSetup) when signed out
- *   - AppStack  (Home → ...) when signed in with a complete profile
+ * Watches session state via useAuth and renders either:
+ *   - AuthStack when signed out
+ *   - AppStack when signed in with a complete profile
  *
- * The transition between stacks is automatic — no manual navigation calls needed.
+ * onAuthSuccess is passed to auth screens so they can trigger
+ * a session refresh after login without direct navigation coupling.
  */
 
 import { NavigationContainer } from '@react-navigation/native';
@@ -21,12 +22,16 @@ import { AuthStackParamList, AppStackParamList } from '../types';
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const AppStack = createNativeStackNavigator<AppStackParamList>();
 
-function AuthNavigator() {
+function AuthNavigator({ onAuthSuccess }: { onAuthSuccess: () => void }) {
   return (
     <AuthStack.Navigator screenOptions={{ headerShown: false }}>
       <AuthStack.Screen name="PhoneEntry" component={PhoneEntryScreen} />
-      <AuthStack.Screen name="OtpVerify" component={OtpVerifyScreen} />
-      <AuthStack.Screen name="DisplayNameSetup" component={DisplayNameSetupScreen} />
+      <AuthStack.Screen name="OtpVerify">
+        {(props) => <OtpVerifyScreen {...props} onAuthSuccess={onAuthSuccess} />}
+      </AuthStack.Screen>
+      <AuthStack.Screen name="DisplayNameSetup">
+        {() => <DisplayNameSetupScreen onAuthSuccess={onAuthSuccess} />}
+      </AuthStack.Screen>
     </AuthStack.Navigator>
   );
 }
@@ -40,9 +45,8 @@ function AppNavigator() {
 }
 
 export default function RootNavigator() {
-  const { user, userDoc, loading } = useAuth();
+  const { uid, userDoc, loading, refresh } = useAuth();
 
-  // Show spinner while determining auth state on app launch
   if (loading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -51,11 +55,14 @@ export default function RootNavigator() {
     );
   }
 
-  const isAuthenticated = !!user && !!userDoc?.displayName;
+  const isAuthenticated = !!uid && !!userDoc?.displayName;
 
   return (
     <NavigationContainer>
-      {isAuthenticated ? <AppNavigator /> : <AuthNavigator />}
+      {isAuthenticated
+        ? <AppNavigator />
+        : <AuthNavigator onAuthSuccess={refresh} />
+      }
     </NavigationContainer>
   );
 }

@@ -10,7 +10,12 @@ import { useAuth } from '../hooks/useAuth';
 import { signOut } from '../services/authService';
 
 export default function HomeScreen() {
-  const { userDoc } = useAuth();
+  const { userDoc, refresh } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    refresh();
+  };
 
   return (
     <View style={styles.container}>
@@ -26,7 +31,7 @@ export default function HomeScreen() {
         Module 1 (Auth) ✅{'\n'}
         Module 2 (Emergency Alert) — coming next
       </Text>
-      <TouchableOpacity style={styles.signOut} onPress={signOut}>
+      <TouchableOpacity style={styles.signOut} onPress={handleSignOut}>
         <Text style={styles.signOutText}>Sign out</Text>
       </TouchableOpacity>
     </View>

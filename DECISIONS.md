@@ -27,7 +27,33 @@ A running log of architectural decisions made during development. Reference this
 
 <!-- Add new entries below as decisions are made during development -->
 
-## 2026 — Module 7 Reference: resqhub-quake-watch repo
+## 2026 — Authentication Provider Change: Firebase Auth → Custom OTP via SMS API PH
+**Decision:** Build a custom OTP system using SMS API PH (smsapiph) instead of Firebase Phone Auth.
+**Rationale:** Firebase Phone Auth requires Blaze (paid) plan for real SMS delivery. SMS API PH is a free Philippine SMS API that doesn't require billing.
+**Architecture:**
+- OTP codes are generated in the app, stored in Firestore `otp_codes/{phoneNumber}` with 10-minute expiry
+- SMS is sent via `https://smsapiph.onrender.com/api/v1/send/sms` with `x-api-key` header
+- On verification, code is matched and deleted (single-use)
+- User session is persisted in AsyncStorage (uid = normalized phone number)
+- Firestore `users/{uid}` document is created on first login with `role: 'resident'`
+**Risk logged:** SMS API PH is a third-party free service with no SLA. If it goes down during the pilot, SMS delivery will fail. Mitigation: test thoroughly before pilot, have a backup plan (Firebase test numbers).
+**Files changed:** `authService.ts`, `otpService.ts`, `smsService.ts`, `useAuth.ts`, all auth screens, `RootNavigator.tsx`
+**Packages removed:** `@react-native-firebase/app`, `@react-native-firebase/auth`
+**Decision:** Replace Firebase Phone Auth with Supabase Phone Auth for OTP delivery.
+**Rationale:** Firebase Phone Auth (real SMS) requires the Blaze pay-as-you-go plan even for development. Supabase free tier includes phone OTP via their own Twilio account at no cost. No billing upgrade needed.
+**What changes:**
+- `authService.ts` — rewritten to use Supabase Auth
+- `firebase.ts` — Auth removed, only Firestore (JS SDK) remains
+- `useAuth.ts` — updated to use Supabase auth state listener
+- `@react-native-firebase/auth` — can be removed
+- Supabase JS client (`@supabase/supabase-js`) added
+**What stays the same:**
+- Firestore remains the database for `users` and `incidents` collections
+- All screens, navigation, and Firestore logic unchanged
+- Role assignment flow unchanged (resident by default, officials/tanods set manually)
+**Note:** Supabase Auth handles the OTP session. After OTP confirmation, we still create/read the `users/{uid}` document in Firestore using the Supabase user's `id` as the document key.
+
+
 **Repo:** https://github.com/HeavenlyBlade/resqhub-quake-watch
 **When to use:** When building Module 7 (Barangay Official & Tanod Dashboard — List & Detail Panel)
 **What to adapt (two things only):**

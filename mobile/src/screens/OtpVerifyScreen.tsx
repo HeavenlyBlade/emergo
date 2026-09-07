@@ -3,8 +3,8 @@
  *
  * Step 2 of 2 in the auth flow.
  * User enters the 6-digit code received via SMS.
- * On success, verifyOtp creates users/{uid} with role: 'resident' if first login,
- * then navigation is handled by the root navigator watching auth state.
+ * On success, navigates to DisplayNameSetup (first login) or
+ * refresh triggers root navigator to show Home.
  */
 
 import { useState } from 'react';
@@ -17,20 +17,19 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
 } from 'react-native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import { confirmOtp } from '../services/authService';
-import { pendingConfirmation } from './PhoneEntryScreen';
 import { AuthStackParamList } from '../types';
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'OtpVerify'>;
   route: RouteProp<AuthStackParamList, 'OtpVerify'>;
+  onAuthSuccess: () => void;
 };
 
-export default function OtpVerifyScreen({ navigation, route }: Props) {
+export default function OtpVerifyScreen({ navigation, route, onAuthSuccess }: Props) {
   const { phoneNumber } = route.params;
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -41,23 +40,16 @@ export default function OtpVerifyScreen({ navigation, route }: Props) {
       return;
     }
 
-    if (!pendingConfirmation) {
-      Alert.alert('Session expired', 'Go back and request a new code.');
-      return;
-    }
-
     setLoading(true);
     try {
-      await confirmOtp(pendingConfirmation, otp);
-      navigation.navigate('DisplayNameSetup');
+      const userDoc = await confirmOtp(phoneNumber, otp);
+      if (!userDoc.displayName) {
+        navigation.navigate('DisplayNameSetup');
+      } else {
+        onAuthSuccess();
+      }
     } catch (error: any) {
-      const message = error?.code === 'auth/invalid-verification-code'
-        ? 'Incorrect code. Check your SMS and try again.'
-        : error?.code === 'auth/code-expired'
-        ? 'The code has expired. Go back and request a new one.'
-        : error?.message ?? 'Something went wrong. Please try again.';
-
-      Alert.alert('Verification failed', message);
+      Alert.alert('Verification failed', error?.message ?? 'Please try again.');
     } finally {
       setLoading(false);
     }
@@ -115,24 +107,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     gap: 14,
   },
-  logo: {
-    fontSize: 48,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#D32F2F',
-  },
-  subtitle: {
-    fontSize: 15,
-    color: '#555',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  phone: {
-    fontWeight: '700',
-    color: '#111',
-  },
+  logo: { fontSize: 48 },
+  title: { fontSize: 26, fontWeight: '700', color: '#D32F2F' },
+  subtitle: { fontSize: 15, color: '#555', textAlign: 'center', lineHeight: 22 },
+  phone: { fontWeight: '700', color: '#111' },
   input: {
     width: '100%',
     height: 64,
@@ -152,17 +130,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  back: {
-    color: '#D32F2F',
-    fontSize: 14,
-    marginTop: 4,
-  },
+  buttonDisabled: { opacity: 0.6 },
+  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  back: { color: '#D32F2F', fontSize: 14, marginTop: 4 },
 });

@@ -1,26 +1,19 @@
 /**
- * authService — Firebase Phone Number Authentication
+ * authService — Custom Phone Auth using SMS API PH + Firestore
  *
- * Uses @react-native-firebase/auth for phone OTP — the native module
- * handles SMS sending and verification without needing a browser/DOM.
- *
- * Firestore calls use the JS SDK via db from firebase.ts.
+ * Since we're not using Firebase Auth, we manage sessions ourselves
+ * using AsyncStorage. A "session" is just the user's uid stored locally.
  *
  * Flow:
- *   1. sendOtp(phoneNumber)              → returns ConfirmationResult
- *   2. confirmOtp(confirmation, otp)     → signs in, creates users/{uid} if first login
- *   3. saveDisplayName(uid, name)        → updates the user document
- *   4. signOut()                         → signs the user out
+ *   1. sendOtp(phoneNumber)          → generates + sends OTP via smsService
+ *   2. confirmOtp(phone, code)       → verifies OTP, creates/loads user doc,
+ *                                      saves session to AsyncStorage
+ *   3. saveDisplayName(uid, name)    → updates users/{uid}.displayName
+ *   4. signOut()                     → clears AsyncStorage session
+ *   5. getStoredSession()            → returns stored uid or null (for app launch)
  */
 
-import {
-  getAuth,
-  signInWithPhoneNumber,
-  signOut as rnfSignOut,
-  onAuthStateChanged,
-  type ConfirmationResult,
-  type User,
-} from '@react-native-firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   doc,
   getDoc,
@@ -29,48 +22,48 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { generateAndSendOtp, verifyOtp } from './otpService';
 import { UserDocument, UserRole } from '../types';
 
-const auth = getAuth();
+const SESSION_KEY = 'emergo_user_uid';
 
 // ─── OTP ─────────────────────────────────────────────────────────────────────
 
-/**
- * Step 1: Send OTP to the given phone number.
- * Returns a ConfirmationResult — pass it to confirmOtp with the code.
- */
-export async function sendOtp(phoneNumber: string): Promise<ConfirmationResult> {
-  const confirmation = await signInWithPhoneNumber(auth, phoneNumber);
-  return confirmation;
+export async function sendOtp(phoneNumber: string): Promise<void> {
+  await generateAndSendOtp(phoneNumber);
 }
 
-/**
- * Step 2: Confirm the OTP code entered by the user.
- * Signs in and creates a Firestore user document if this is the first login.
- */
 export async function confirmOtp(
-  confirmation: ConfirmationResult,
-  otp: string
-): Promise<User> {
-  const result = await confirmation.confirm(otp);
-  if (!result) throw new Error('Confirmation failed');
-  const user = result.user;
+  phoneNumber: string,
+  code: string
+): Promise<UserDocument> {
+  const isValid = await verifyOtp(phoneNumber, code);
+  if (!isValid) {
+    throw new Error('Invalid or expired verification code. Please try again.');
+  }
+
+  // Use phone number as uid (normalized: strip +)
+  const uid = phoneNumber.replace(/\+/g, '').replace(/\s/g, '');
 
   // Create users/{uid} on first login with role: 'resident' by default
-  const userRef = doc(db, 'users', user.uid);
+  const userRef = doc(db, 'users', uid);
   const userSnap = await getDoc(userRef);
 
   if (!userSnap.exists()) {
     const newUser: Omit<UserDocument, 'uid'> = {
       role: 'resident' as UserRole,
       displayName: '',
-      phoneNumber: user.phoneNumber ?? '',
+      phoneNumber,
       createdAt: serverTimestamp() as any,
     };
     await setDoc(userRef, newUser);
   }
 
-  return user;
+  // Persist session locally
+  await AsyncStorage.setItem(SESSION_KEY, uid);
+
+  const snap = await getDoc(userRef);
+  return { uid, ...snap.data() } as UserDocument;
 }
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
@@ -90,14 +83,12 @@ export async function getUserDocument(uid: string): Promise<UserDocument | null>
   return { uid, ...snap.data() } as UserDocument;
 }
 
-// ─── Auth state ───────────────────────────────────────────────────────────────
+// ─── Session ──────────────────────────────────────────────────────────────────
 
-export async function signOut(): Promise<void> {
-  await rnfSignOut(auth);
+export async function getStoredSession(): Promise<string | null> {
+  return await AsyncStorage.getItem(SESSION_KEY);
 }
 
-export function subscribeToAuthState(
-  callback: (user: User | null) => void
-): () => void {
-  return onAuthStateChanged(auth, callback);
+export async function signOut(): Promise<void> {
+  await AsyncStorage.removeItem(SESSION_KEY);
 }

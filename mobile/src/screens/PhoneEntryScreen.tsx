@@ -3,8 +3,7 @@
  *
  * Step 1 of 2 in the auth flow.
  * User enters their Philippine mobile number (+63...).
- * On submit, sends OTP via Firebase signInWithPhoneNumber
- * and navigates to OtpVerifyScreen with the ConfirmationResult.
+ * On submit, generates and sends an OTP via SMS API PH.
  */
 
 import { useState } from 'react';
@@ -19,13 +18,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getAuth } from '@react-native-firebase/auth';
-import { type ConfirmationResult } from '@react-native-firebase/auth';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { sendOtp } from '../services/authService';
 import { AuthStackParamList } from '../types';
-
-export let pendingConfirmation: ConfirmationResult | null = null;
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'PhoneEntry'>;
@@ -50,19 +45,13 @@ export default function PhoneEntryScreen({ navigation }: Props) {
     setLoading(true);
 
     try {
-      const confirmation = await sendOtp(fullNumber);
-      pendingConfirmation = confirmation;
+      await sendOtp(fullNumber);
       navigation.navigate('OtpVerify', { phoneNumber: fullNumber });
     } catch (error: any) {
-      // Common errors and friendly messages
-      const message =
-        error?.code === 'auth/invalid-phone-number'
-          ? 'That phone number is not valid. Check and try again.'
-          : error?.code === 'auth/too-many-requests'
-          ? 'Too many attempts. Please wait a few minutes and try again.'
-          : error?.message ?? 'Failed to send code. Please try again.';
-
-      Alert.alert('Could not send code', message);
+      Alert.alert(
+        'Could not send code',
+        error?.message ?? 'Failed to send verification code. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -105,9 +94,7 @@ export default function PhoneEntryScreen({ navigation }: Props) {
         )}
       </TouchableOpacity>
 
-      <Text style={styles.note}>
-        You'll receive a 6-digit SMS code.
-      </Text>
+      <Text style={styles.note}>You'll receive a 6-digit SMS code.</Text>
     </KeyboardAvoidingView>
   );
 }

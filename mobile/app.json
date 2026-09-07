@@ -14,8 +14,7 @@
           "color": "#D32F2F"
         }
       ],
-      "expo-web-browser",
-      "@react-native-firebase/app"
+      "expo-web-browser"
     ],
     "ios": {
       "supportsTablet": true,
@@ -23,7 +22,6 @@
     },
     "android": {
       "package": "com.emergo.app",
-      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#D32F2F",
         "foregroundImage": "./assets/android-icon-foreground.png",

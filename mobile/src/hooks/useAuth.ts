@@ -1,49 +1,67 @@
 /**
- * useAuth — subscribes to Firebase auth state and the user's Firestore document.
+ * useAuth — manages session and user document state
+ *
+ * On mount: checks AsyncStorage for a stored uid.
+ * If found: loads the Firestore user document and subscribes to real-time updates.
+ * If not found: user is not logged in.
+ *
+ * Exposes a refresh function so screens can trigger a reload after login.
  */
 
-import { useEffect, useState } from 'react';
-import { type User } from '@react-native-firebase/auth';
+import { useEffect, useState, useCallback } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { subscribeToAuthState } from '../services/authService';
+import { getStoredSession } from '../services/authService';
 import { db } from '../services/firebase';
 import { UserDocument } from '../types';
 
 interface UseAuthReturn {
-  user: User | null;
+  uid: string | null;
   userDoc: UserDocument | null;
   loading: boolean;
+  refresh: () => void;
 }
 
 export function useAuth(): UseAuthReturn {
-  const [user, setUser] = useState<User | null>(null);
+  const [uid, setUid] = useState<string | null>(null);
   const [userDoc, setUserDoc] = useState<UserDocument | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(0);
+
+  // Call refresh() after login/logout to re-check session
+  const refresh = useCallback(() => setTick((t) => t + 1), []);
 
   useEffect(() => {
-    const unsubscribeAuth = subscribeToAuthState((firebaseUser) => {
-      setUser(firebaseUser);
-      if (!firebaseUser) {
+    let unsubscribeDoc: (() => void) | undefined;
+
+    const init = async () => {
+      setLoading(true);
+      const storedUid = await getStoredSession();
+      setUid(storedUid);
+
+      if (!storedUid) {
         setUserDoc(null);
         setLoading(false);
+        return;
       }
-    });
-    return () => unsubscribeAuth();
-  }, []);
 
-  useEffect(() => {
-    if (!user) return;
+      // Subscribe to real-time user document updates
+      const userRef = doc(db, 'users', storedUid);
+      unsubscribeDoc = onSnapshot(userRef, (snap) => {
+        if (snap.exists()) {
+          setUserDoc({ uid: storedUid, ...snap.data() } as UserDocument);
+        } else {
+          setUserDoc(null);
+        }
+        setLoading(false);
+      });
+    };
 
-    const userRef = doc(db, 'users', user.uid);
-    const unsubscribeDoc = onSnapshot(userRef, (snap) => {
-      if (snap.exists()) {
-        setUserDoc({ uid: user.uid, ...snap.data() } as UserDocument);
-      }
-      setLoading(false);
-    });
+    init();
 
-    return () => unsubscribeDoc();
-  }, [user]);
+    return () => {
+      if (unsubscribeDoc) unsubscribeDoc();
+    };
+  }, [tick]);
 
-  return { user, userDoc, loading };
+  return { uid, userDoc, loading, refresh };
 }
