@@ -1,35 +1,55 @@
 /**
- * HomeScreen — placeholder
+ * HomeScreen — role-based router
  *
- * This screen is a placeholder for now.
- * It will be replaced with the actual resident home screen in Module 2 (Emergency Alert).
+ * Residents → AlertScreen
+ * Officials/Tanods → placeholder (Dashboard coming in Module 7)
+ *
+ * This screen itself is just a thin router — it redirects immediately
+ * based on the user's role. The actual UI is in the role-specific screens.
  */
 
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../hooks/useAuth';
 import { signOut } from '../services/authService';
+import { AppStackParamList } from '../types';
 
-export default function HomeScreen() {
+type Props = {
+  navigation: NativeStackNavigationProp<AppStackParamList, 'Home'>;
+};
+
+export default function HomeScreen({ navigation }: Props) {
   const { userDoc, refresh } = useAuth();
+
+  useEffect(() => {
+    if (!userDoc) return;
+    if (userDoc.role === 'resident') {
+      navigation.replace('Alert');
+    }
+    // Officials and tanods stay here until Dashboard is built in Module 7
+  }, [userDoc]);
 
   const handleSignOut = async () => {
     await signOut();
     refresh();
   };
 
+  // Shown to officials/tanods until dashboard is ready
   return (
     <View style={styles.container}>
       <Text style={styles.logo}>🚨</Text>
       <Text style={styles.title}>Emergo</Text>
       <Text style={styles.welcome}>
-        Welcome, {userDoc?.displayName || 'loading...'}
+        Welcome, {userDoc?.displayName ?? '...'}
       </Text>
       <Text style={styles.role}>
         Role: <Text style={styles.roleBadge}>{userDoc?.role}</Text>
       </Text>
       <Text style={styles.note}>
-        Module 1 (Auth) ✅{'\n'}
-        Module 2 (Emergency Alert) — coming next
+        {userDoc?.role === 'official' || userDoc?.role === 'tanod'
+          ? 'Dashboard coming in Module 7'
+          : 'Loading...'}
       </Text>
       <TouchableOpacity style={styles.signOut} onPress={handleSignOut}>
         <Text style={styles.signOutText}>Sign out</Text>
@@ -52,13 +72,7 @@ const styles = StyleSheet.create({
   welcome: { fontSize: 18, fontWeight: '600', color: '#111' },
   role: { fontSize: 14, color: '#555' },
   roleBadge: { fontWeight: '700', color: '#D32F2F' },
-  note: {
-    fontSize: 13,
-    color: '#888',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginTop: 12,
-  },
+  note: { fontSize: 13, color: '#888', textAlign: 'center', marginTop: 12 },
   signOut: { marginTop: 24 },
   signOutText: { color: '#D32F2F', fontSize: 14, fontWeight: '600' },
 });

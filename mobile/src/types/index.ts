@@ -61,4 +61,5 @@ export type AuthStackParamList = {
  */
 export type AppStackParamList = {
   Home: undefined;
+  Alert: undefined;
 };

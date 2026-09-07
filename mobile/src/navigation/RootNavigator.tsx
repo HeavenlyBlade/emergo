@@ -17,6 +17,7 @@ import PhoneEntryScreen from '../screens/PhoneEntryScreen';
 import OtpVerifyScreen from '../screens/OtpVerifyScreen';
 import DisplayNameSetupScreen from '../screens/DisplayNameSetupScreen';
 import HomeScreen from '../screens/HomeScreen';
+import AlertScreen from '../screens/AlertScreen';
 import { AuthStackParamList, AppStackParamList } from '../types';
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -40,6 +41,7 @@ function AppNavigator() {
   return (
     <AppStack.Navigator screenOptions={{ headerShown: false }}>
       <AppStack.Screen name="Home" component={HomeScreen} />
+      <AppStack.Screen name="Alert" component={AlertScreen} />
     </AppStack.Navigator>
   );
 }

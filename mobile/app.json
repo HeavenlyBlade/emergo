@@ -14,7 +14,13 @@
           "color": "#D32F2F"
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Emergo needs your location to send your exact position with emergency alerts."
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true,
