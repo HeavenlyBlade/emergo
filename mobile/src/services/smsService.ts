@@ -1,37 +1,53 @@
 /**
- * smsService — SMS delivery via SMS API PH
+ * smsService — SMS delivery via Android SMS Gateway
  *
- * Sends SMS messages using the smsapiph.onrender.com API.
- * API key is read from EXPO_PUBLIC_SMS_API_KEY in .env
+ * Uses https://github.com/capcom6/android-sms-gateway
+ * A dedicated Android phone with a SIM card acts as the SMS gateway.
+ * The app on that phone exposes an API that sends real SMS via the device's SIM.
  *
- * The API has intelligent fallback:
- *   1. Try SMS
- *   2. If SMS fails → Try Email
- *   3. If Email fails → Send Push Notification
+ * Two modes:
+ *   - Cloud mode: phone connects to api.sms-gate.app, accessible from anywhere
+ *   - Local mode: phone runs a local server, only accessible on same Wi-Fi
+ *
+ * We use Cloud mode so the Emergo app can reach the gateway from any network.
+ *
+ * Credentials are stored in .env:
+ *   EXPO_PUBLIC_SMS_GATEWAY_USER=your_username
+ *   EXPO_PUBLIC_SMS_GATEWAY_PASS=your_password
  */
 
-const SMS_API_URL = 'https://smsapiph.onrender.com/api/v1/send/sms';
-const API_KEY = process.env.EXPO_PUBLIC_SMS_API_KEY ?? '';
+const SMS_GATEWAY_URL = 'https://api.sms-gate.app/3rdparty/v1/message';
+
+const GATEWAY_USER = process.env.EXPO_PUBLIC_SMS_GATEWAY_USER ?? '';
+const GATEWAY_PASS = process.env.EXPO_PUBLIC_SMS_GATEWAY_PASS ?? '';
 
 export async function sendSms(
   recipient: string,
   message: string
 ): Promise<void> {
-  if (!API_KEY) {
-    throw new Error('SMS API key is not configured. Set EXPO_PUBLIC_SMS_API_KEY in .env');
+  if (!GATEWAY_USER || !GATEWAY_PASS) {
+    throw new Error(
+      'SMS Gateway credentials not configured. Set EXPO_PUBLIC_SMS_GATEWAY_USER and EXPO_PUBLIC_SMS_GATEWAY_PASS in .env'
+    );
   }
 
-  const response = await fetch(SMS_API_URL, {
+  // Basic auth: base64(username:password)
+  const credentials = btoa(`${GATEWAY_USER}:${GATEWAY_PASS}`);
+
+  const response = await fetch(SMS_GATEWAY_URL, {
     method: 'POST',
     headers: {
-      'x-api-key': API_KEY,
+      'Authorization': `Basic ${credentials}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ recipient, message }),
+    body: JSON.stringify({
+      textMessage: { text: message },
+      phoneNumbers: [recipient],
+    }),
   });
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`SMS API error ${response.status}: ${body}`);
+    throw new Error(`SMS Gateway error ${response.status}: ${body}`);
   }
 }

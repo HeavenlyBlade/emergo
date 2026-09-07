@@ -27,17 +27,17 @@ A running log of architectural decisions made during development. Reference this
 
 <!-- Add new entries below as decisions are made during development -->
 
-## 2026 — Authentication Provider Change: Firebase Auth → Custom OTP via SMS API PH
-**Decision:** Build a custom OTP system using SMS API PH (smsapiph) instead of Firebase Phone Auth.
-**Rationale:** Firebase Phone Auth requires Blaze (paid) plan for real SMS delivery. SMS API PH is a free Philippine SMS API that doesn't require billing.
+## 2026 — Authentication Provider Change: Firebase Auth → Custom OTP via Android SMS Gateway
+**Decision:** Build a custom OTP system using Android SMS Gateway instead of Firebase Phone Auth.
+**Rationale:** Firebase Phone Auth requires Blaze (paid) plan. SMS API PH was tried but unreliable. Android SMS Gateway uses a dedicated Android phone with a real SIM card — fully reliable, free beyond SIM load cost (~₱50–100 for pilot).
 **Architecture:**
-- OTP codes are generated in the app, stored in Firestore `otp_codes/{phoneNumber}` with 10-minute expiry
-- SMS is sent via `https://smsapiph.onrender.com/api/v1/send/sms` with `x-api-key` header
-- On verification, code is matched and deleted (single-use)
-- User session is persisted in AsyncStorage (uid = normalized phone number)
-- Firestore `users/{uid}` document is created on first login with `role: 'resident'`
-**Risk logged:** SMS API PH is a third-party free service with no SLA. If it goes down during the pilot, SMS delivery will fail. Mitigation: test thoroughly before pilot, have a backup plan (Firebase test numbers).
-**Files changed:** `authService.ts`, `otpService.ts`, `smsService.ts`, `useAuth.ts`, all auth screens, `RootNavigator.tsx`
+- OTP codes generated in app, stored in Firestore `otp_codes/{phoneNumber}` with 10-minute expiry
+- SMS sent via Android SMS Gateway cloud API (`https://api.sms-gate.app/3rdparty/v1/message`) with Basic Auth
+- On verification, code matched and deleted (single-use)
+- User session persisted in AsyncStorage (uid = normalized phone number)
+- Firestore `users/{uid}` created on first login with `role: 'resident'`
+**SMS Gateway setup:** Dedicated Android phone + SIM runs the SMS Gateway app in Cloud mode. Credentials stored in `mobile/.env` as `EXPO_PUBLIC_SMS_GATEWAY_USER` and `EXPO_PUBLIC_SMS_GATEWAY_PASS`.
+**Risk:** Gateway phone must stay on and connected during pilot. If it goes offline, OTP delivery fails. Mitigation: keep phone plugged in and on Wi-Fi during pilot window.
 **Packages removed:** `@react-native-firebase/app`, `@react-native-firebase/auth`
 **Decision:** Replace Firebase Phone Auth with Supabase Phone Auth for OTP delivery.
 **Rationale:** Firebase Phone Auth (real SMS) requires the Blaze pay-as-you-go plan even for development. Supabase free tier includes phone OTP via their own Twilio account at no cost. No billing upgrade needed.
