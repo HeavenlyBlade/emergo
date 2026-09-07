@@ -10,7 +10,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { getStoredSession } from '../services/authService';
+import { getStoredSession, registerPushTokenIfNeeded } from '../services/authService';
 import { db } from '../services/firebase';
 import { UserDocument } from '../types';
 
@@ -48,7 +48,10 @@ export function useAuth(): UseAuthReturn {
       const userRef = doc(db, 'users', storedUid);
       unsubscribeDoc = onSnapshot(userRef, (snap) => {
         if (snap.exists()) {
-          setUserDoc({ uid: storedUid, ...snap.data() } as UserDocument);
+          const data = { uid: storedUid, ...snap.data() } as UserDocument;
+          setUserDoc(data);
+          // Register push token for officials/tanods on first load
+          registerPushTokenIfNeeded(storedUid, data.role).catch(() => {});
         } else {
           setUserDoc(null);
         }

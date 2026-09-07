@@ -92,3 +92,19 @@ export async function getStoredSession(): Promise<string | null> {
 export async function signOut(): Promise<void> {
   await AsyncStorage.removeItem(SESSION_KEY);
 }
+
+// ─── Push token registration ───────────────────────────────────────────────
+
+/**
+ * Called after user doc loads in useAuth.
+ * Registers push token for officials and tanods only.
+ */
+export async function registerPushTokenIfNeeded(
+  uid: string,
+  role: string
+): Promise<void> {
+  if (role === 'official' || role === 'tanod') {
+    const { registerPushToken } = await import('./notificationService');
+    await registerPushToken(uid);
+  }
+}

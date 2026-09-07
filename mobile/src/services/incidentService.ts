@@ -51,6 +51,18 @@ export async function submitEmergencyAlert(
     description: description?.trim() ?? '',
   });
 
+  // Notify all officials and tanods via Expo Push (fire and forget)
+  const userSnap = await import('firebase/firestore').then(({ doc, getDoc }) =>
+    getDoc(doc(db, 'users', uid))
+  );
+  const reporterName = userSnap.exists()
+    ? userSnap.data().displayName ?? 'A resident'
+    : 'A resident';
+
+  import('./notificationService').then(({ notifyOfficialsAndTanods }) => {
+    notifyOfficialsAndTanods(incidentRef.id, reporterName, coords).catch(() => {});
+  });
+
   return incidentRef.id;
 }
 
@@ -76,5 +88,56 @@ export function subscribeToMyIncidents(
       ...d.data(),
     })) as IncidentDocument[];
     callback(incidents);
+  });
+}
+
+// ─── Status transitions ───────────────────────────────────────────────────────
+
+/**
+ * Verify an incident — ONLY role == 'official' should call this.
+ * Uses a Firestore transaction to prevent race conditions:
+ * if two officials tap verify at the same time, only the first succeeds.
+ */
+export async function verifyIncident(
+  incidentId: string,
+  officialUid: string
+): Promise<void> {
+  const { runTransaction, doc } = await import('firebase/firestore');
+  const incidentRef = doc(db, 'incidents', incidentId);
+
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(incidentRef);
+    if (!snap.exists()) throw new Error('Incident not found.');
+
+    const current = snap.data();
+    if (current.status !== 'unverified') {
+      throw new Error(
+        current.status === 'verified'
+          ? `Already verified by another official.`
+          : 'This incident has already been resolved.'
+      );
+    }
+
+    transaction.update(incidentRef, {
+      status: 'verified',
+      verifiedBy: officialUid,
+      verifiedAt: (await import('firebase/firestore')).serverTimestamp(),
+    });
+  });
+}
+
+/**
+ * Resolve an incident — ONLY role == 'official' should call this.
+ */
+export async function resolveIncident(
+  incidentId: string,
+  officialUid: string
+): Promise<void> {
+  const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
+  const incidentRef = doc(db, 'incidents', incidentId);
+  await updateDoc(incidentRef, {
+    status: 'resolved',
+    resolvedBy: officialUid,
+    resolvedAt: serverTimestamp(),
   });
 }
