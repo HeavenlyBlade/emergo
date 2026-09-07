@@ -1,18 +1,17 @@
 /**
  * Firebase configuration and initialization
  *
- * Uses the Firebase JS SDK (v11) — pure JavaScript, no native modules needed.
- * Credentials come from google-services.json (Android) — never hardcode these
- * in source control. This file reads from constants derived from that file.
+ * Auth uses @react-native-firebase/auth — native module, properly supports
+ * phone number OTP on Android without a DOM/browser reCAPTCHA.
+ *
+ * Firestore uses the Firebase JS SDK — pure JS, no native module needed.
+ *
+ * @react-native-firebase reads google-services.json automatically at build time,
+ * so no manual config object is needed for auth.
  */
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { initializeAuth } from 'firebase/auth';
-// @firebase/auth exposes getReactNativePersistence for React Native environments
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { getReactNativePersistence } = require('@firebase/auth');
 import { getFirestore } from 'firebase/firestore';
-import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAVuho32VquGJoVRO48bpoNOR1AE55qoDk',
@@ -25,14 +24,8 @@ const firebaseConfig = {
 
 export { firebaseConfig };
 
-// Prevent re-initialization on hot reload
+// JS SDK app instance — used for Firestore only
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-
-// Auth with AsyncStorage persistence so users stay logged in between app restarts
-export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(ReactNativeAsyncStorage),
-});
-
 export const db = getFirestore(app);
 
 export default app;

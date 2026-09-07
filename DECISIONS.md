@@ -27,6 +27,21 @@ A running log of architectural decisions made during development. Reference this
 
 <!-- Add new entries below as decisions are made during development -->
 
+## 2026 — Module 7 Reference: resqhub-quake-watch repo
+**Repo:** https://github.com/HeavenlyBlade/resqhub-quake-watch
+**When to use:** When building Module 7 (Barangay Official & Tanod Dashboard — List & Detail Panel)
+**What to adapt (two things only):**
+
+1. **Real-time subscription pattern** from `src/pages/Dashboard.tsx`:
+   - The pattern of subscribing to new items, prepending them to state, showing a toast, and cleaning up on unmount is directly applicable.
+   - In Emergo, replace Supabase's `channel.on('postgres_changes')` with Firestore's `onSnapshot` on the `incidents` collection.
+   - Reference lines: the `useEffect` block starting with `const channel = supabase.channel(...)`.
+
+2. **`formatTime` utility** from `src/pages/Dashboard.tsx`:
+   - Shows relative time ("5m ago", "2h ago", "3d ago") — copy and adapt this directly for the incident list timestamp display.
+
+**What NOT to use:** Auth (email/password + Supabase), data model (earthquake fields), UI library (shadcn/ui), or folder structure (flat, Lovable-generated). Different stack, different domain.
+
 ## 2026 — Authentication Provider (Module 1: Authentication & Role-Based Accounts)
 **Decision:** Firebase Phone Number Authentication (OTP via SMS) for all user roles — residents, officials, and tanods.
 **Rationale:** The target users are barangay residents in a local area who are not tech-savvy. Phone number login removes the need to remember a password or have a dedicated email account. Everyone knows their phone number. The login flow is: enter number → receive SMS code → enter 6 digits → done.

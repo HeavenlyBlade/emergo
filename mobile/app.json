@@ -14,7 +14,8 @@
           "color": "#D32F2F"
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "@react-native-firebase/app"
     ],
     "ios": {
       "supportsTablet": true,

@@ -19,13 +19,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { getAuth } from '@react-native-firebase/auth';
+import { type ConfirmationResult } from '@react-native-firebase/auth';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { sendOtp } from '../services/authService';
 import { AuthStackParamList } from '../types';
 
-// ConfirmationResult can't be serialized into nav params — store it in module scope
-// It's a lightweight object and this screen is always unmounted after navigating away
-import type { ConfirmationResult } from 'firebase/auth';
 export let pendingConfirmation: ConfirmationResult | null = null;
 
 type Props = {

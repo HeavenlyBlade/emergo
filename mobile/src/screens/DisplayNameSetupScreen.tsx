@@ -17,7 +17,7 @@ import {
   TextInput,
   TouchableOpacity,
 } from 'react-native';
-import { auth } from '../services/firebase';
+import { getAuth } from '@react-native-firebase/auth';
 import { saveDisplayName } from '../services/authService';
 
 export default function DisplayNameSetupScreen() {
@@ -31,7 +31,7 @@ export default function DisplayNameSetupScreen() {
       return;
     }
 
-    const uid = auth.currentUser?.uid;
+    const uid = getAuth().currentUser?.uid;
     if (!uid) {
       Alert.alert('Error', 'No user session found. Please log in again.');
       return;

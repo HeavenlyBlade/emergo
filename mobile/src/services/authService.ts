@@ -1,8 +1,10 @@
 /**
  * authService — Firebase Phone Number Authentication
  *
- * All Firebase Auth calls live here.
- * Components never import from 'firebase/auth' directly.
+ * Uses @react-native-firebase/auth for phone OTP — the native module
+ * handles SMS sending and verification without needing a browser/DOM.
+ *
+ * Firestore calls use the JS SDK via db from firebase.ts.
  *
  * Flow:
  *   1. sendOtp(phoneNumber)              → returns ConfirmationResult
@@ -12,12 +14,13 @@
  */
 
 import {
+  getAuth,
   signInWithPhoneNumber,
-  ConfirmationResult,
-  signOut as firebaseSignOut,
+  signOut as rnfSignOut,
   onAuthStateChanged,
-  User,
-} from 'firebase/auth';
+  type ConfirmationResult,
+  type User,
+} from '@react-native-firebase/auth';
 import {
   doc,
   getDoc,
@@ -25,21 +28,18 @@ import {
   updateDoc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { db } from './firebase';
 import { UserDocument, UserRole } from '../types';
+
+const auth = getAuth();
 
 // ─── OTP ─────────────────────────────────────────────────────────────────────
 
 /**
  * Step 1: Send OTP to the given phone number.
  * Returns a ConfirmationResult — pass it to confirmOtp with the code.
- *
- * On Android, Firebase may auto-read the SMS code (SMS Retriever API).
- * The user will still see the OTP screen but the code may pre-fill.
  */
 export async function sendOtp(phoneNumber: string): Promise<ConfirmationResult> {
-  // signInWithPhoneNumber handles reCAPTCHA internally on React Native
-  // No external verifier component needed in SDK 57+
   const confirmation = await signInWithPhoneNumber(auth, phoneNumber);
   return confirmation;
 }
@@ -47,13 +47,13 @@ export async function sendOtp(phoneNumber: string): Promise<ConfirmationResult> 
 /**
  * Step 2: Confirm the OTP code entered by the user.
  * Signs in and creates a Firestore user document if this is the first login.
- * Returns the signed-in Firebase User.
  */
 export async function confirmOtp(
   confirmation: ConfirmationResult,
   otp: string
 ): Promise<User> {
   const result = await confirmation.confirm(otp);
+  if (!result) throw new Error('Confirmation failed');
   const user = result.user;
 
   // Create users/{uid} on first login with role: 'resident' by default
@@ -75,9 +75,6 @@ export async function confirmOtp(
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
-/**
- * Save the user's display name after first login.
- */
 export async function saveDisplayName(
   uid: string,
   displayName: string
@@ -86,9 +83,6 @@ export async function saveDisplayName(
   await updateDoc(userRef, { displayName: displayName.trim() });
 }
 
-/**
- * Get the current user's Firestore document.
- */
 export async function getUserDocument(uid: string): Promise<UserDocument | null> {
   const userRef = doc(db, 'users', uid);
   const snap = await getDoc(userRef);
@@ -99,7 +93,7 @@ export async function getUserDocument(uid: string): Promise<UserDocument | null>
 // ─── Auth state ───────────────────────────────────────────────────────────────
 
 export async function signOut(): Promise<void> {
-  await firebaseSignOut(auth);
+  await rnfSignOut(auth);
 }
 
 export function subscribeToAuthState(
