@@ -1,11 +1,10 @@
 /**
- * AdminPage  EModule 9: Admin/Records
+ * AdminPage — Module 9: Admin/Records
  *
  * Incident history with basic statistics and export.
  * Centralized record for future planning.
  */
 
-import { useState } from 'react';
 import { useIncidents } from '../hooks/useIncidents';
 import { useAuth } from '../hooks/useAuth';
 import { STATUS_BG, STATUS_LABELS, formatFullDate } from '../utils/incidentUtils';
@@ -28,12 +27,12 @@ export default function AdminPage() {
       ...incidents.map((i) => [
         i.id,
         i.status,
-        i.reportedAt ? (i.reportedAt as any).toDate().toISOString() : '',
+        i.reportedAt ? i.reportedAt.toDate().toISOString() : '',
         i.reportedBy,
         i.description ?? '',
         i.verifiedBy ?? '',
-        i.verifiedAt ? (i.verifiedAt as any).toDate().toISOString() : '',
-        i.resolvedAt ? (i.resolvedAt as any).toDate().toISOString() : '',
+        i.verifiedAt ? i.verifiedAt.toDate().toISOString() : '',
+        i.resolvedAt ? i.resolvedAt.toDate().toISOString() : '',
       ]),
     ];
 
@@ -54,7 +53,7 @@ export default function AdminPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Records & Admin</h1>
+            <h1 className="text-xl font-bold text-gray-900">Records &amp; Admin</h1>
             <p className="text-sm text-gray-500">Incident history for Barangay Marketview</p>
           </div>
           <button
@@ -94,9 +93,13 @@ export default function AdminPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={4} className="text-center py-8 text-gray-400">Loading...</td></tr>
+                  <tr>
+                    <td colSpan={4} className="text-center py-8 text-gray-400">Loading...</td>
+                  </tr>
                 ) : incidents.length === 0 ? (
-                  <tr><td colSpan={4} className="text-center py-8 text-gray-400">No records yet.</td></tr>
+                  <tr>
+                    <td colSpan={4} className="text-center py-8 text-gray-400">No records yet.</td>
+                  </tr>
                 ) : (
                   incidents.map((incident) => (
                     <tr key={incident.id} className="border-b border-gray-100 hover:bg-gray-50">
@@ -112,7 +115,7 @@ export default function AdminPage() {
                         {incident.reportedBy.slice(-8)}
                       </td>
                       <td className="px-4 py-3 text-gray-600">
-                        {incident.description || ' E}
+                        {incident.description || 'No description'}
                       </td>
                     </tr>
                   ))
