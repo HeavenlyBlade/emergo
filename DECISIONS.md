@@ -78,3 +78,8 @@ A running log of architectural decisions made during development. Reference this
 - Firebase Phone Auth on the free Spark plan is limited to 10 SMS verifications per day — sufficient for a ~35-person pilot as long as registrations are spread across days
 - Do not run SMS-heavy stress tests during development — use Firebase's built-in test phone numbers feature instead (console → Authentication → Sign-in method → Phone → Test phone numbers)
 - Phone auth requires a real physical device for testing — the OTP flow does not work in simulators
+
+## 2026 — Map Library: Google Maps JS API → Leaflet + OpenStreetMap
+**Decision:** Use Leaflet + OpenStreetMap (`react-leaflet`) instead of Google Maps JavaScript API.
+**Rationale:** Google Maps JS API requires billing account setup even for free-tier usage. Leaflet + OpenStreetMap is completely free with no API key, no account, and no billing.
+**Impact:** Only `MapPage.tsx` changed. All other dashboard logic identical. Map pins use `CircleMarker` from react-leaflet.

@@ -14,7 +14,7 @@ Emergo Dashboard is the web interface for Barangay Marketview officials and tano
 ## Tech Stack
 - **Framework:** React + TypeScript (Vite)
 - **Authentication:** Firebase Phone Number Authentication (OTP via SMS) — same provider as the mobile app. Dashboard users (officials/tanods) log in with their phone number. Role is read from `users/{uid}.role` in Firestore after auth. The dashboard never allows role self-assignment.
-- **Maps:** Google Maps JavaScript API (`@vis.gl/react-google-maps`) — NOT the mobile SDK
+- **Maps:** Leaflet + OpenStreetMap (`react-leaflet`) — completely free, no API key required. NOT Google Maps JS API.
 - **Backend:** Firebase (Authentication, Cloud Firestore — same project as mobile app)
 - **Styling:** Tailwind CSS
 - **State:** React context + custom hooks (no external state library unless complexity demands it)
@@ -57,12 +57,12 @@ dashboard/
 ---
 
 ## Maps Rules
-- Use Google Maps **JavaScript API** for the dashboard (`@vis.gl/react-google-maps` or `@react-google-maps/api`)
-- Do NOT use the React Native Maps or mobile SDK — those are for the Expo app only
-- Map pins must visually distinguish incident status:
-  - `unverified` → pulsing outline marker
-  - `verified` → solid filled marker
-  - `resolved` → grayed-out marker
+- Use **Leaflet + OpenStreetMap** (`react-leaflet`) — completely free, no API key required
+- Do NOT use Google Maps JS API or any paid map service
+- Map pins use `CircleMarker` from react-leaflet, color-coded by incident status:
+  - `unverified` → amber (#F59E0B)
+  - `verified` → green (#10B981)
+  - `resolved` → gray (#9CA3AF)
 - The map must update in real time via a Firestore `onSnapshot` listener — no manual refresh
 
 ---

@@ -1,6 +1,8 @@
 /**
  * MapPage — Module 6: Dashboard Live Map
  *
+ * Uses Leaflet + OpenStreetMap — completely free, no API key needed.
+ *
  * Real-time Firestore listener on incidents collection.
  * Status-differentiated pins:
  *   - unverified: amber/pulsing
@@ -8,42 +10,40 @@
  *   - resolved: gray
  *
  * Clicking a pin opens the incident detail panel.
- *
- * Uses Google Maps JavaScript API via @vis.gl/react-google-maps.
- * NOT the mobile SDK — see steering file.
  */
 
-import { useState } from 'react';
-import { APIProvider, Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
+import { useEffect, useState } from 'react';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import { useIncidents } from '../hooks/useIncidents';
 import { useAuth } from '../hooks/useAuth';
 import { IncidentDocument } from '../types';
 import { STATUS_COLORS, STATUS_LABELS, formatRelativeTime } from '../utils/incidentUtils';
 import IncidentDetailPanel from '../components/IncidentDetailPanel';
 import Sidebar from '../components/Sidebar';
-
-const MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+import { Timestamp } from 'firebase/firestore';
 
 // Center on Barangay Marketview, Lucena City
-const DEFAULT_CENTER = { lat: 13.9374, lng: 121.6175 };
+const DEFAULT_CENTER: [number, number] = [13.9374, 121.6175];
+const DEFAULT_ZOOM = 15;
+
+// Auto-fly to newly selected incident
+function MapFlyTo({ coords }: { coords: [number, number] | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (coords) map.flyTo(coords, 17, { duration: 1 });
+  }, [coords]);
+  return null;
+}
 
 export default function MapPage() {
   const { incidents, loading } = useIncidents();
   const { uid, userDoc } = useAuth();
   const [selected, setSelected] = useState<IncidentDocument | null>(null);
 
-  if (!MAPS_API_KEY || MAPS_API_KEY === 'your_google_maps_web_api_key_here') {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50">
-        <div className="text-center p-8">
-          <p className="text-lg font-semibold text-gray-700">Google Maps API key not configured</p>
-          <p className="text-sm text-gray-500 mt-2">
-            Add <code className="bg-gray-100 px-1 rounded">VITE_GOOGLE_MAPS_API_KEY</code> to your <code>.env</code> file
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const selectedCoords: [number, number] | null = selected?.location
+    ? [selected.location.latitude, selected.location.longitude]
+    : null;
 
   return (
     <div className="flex h-screen">
@@ -51,7 +51,7 @@ export default function MapPage() {
 
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
+        <div className="bg-white border-b px-6 py-4 flex items-center justify-between shrink-0">
           <div>
             <h1 className="text-xl font-bold text-gray-900">Live Map</h1>
             <p className="text-sm text-gray-500">
@@ -60,28 +60,38 @@ export default function MapPage() {
               {incidents.filter(i => i.status === 'resolved').length} resolved
             </p>
           </div>
+          {/* Legend */}
           <div className="flex gap-4 text-xs text-gray-600">
-            {Object.entries(STATUS_LABELS).map(([status, label]) => (
-              <span key={status} className="flex items-center gap-1">
-                <span
-                  className="w-3 h-3 rounded-full inline-block"
-                  style={{ backgroundColor: STATUS_COLORS[status as keyof typeof STATUS_COLORS] }}
-                />
-                {label}
-              </span>
-            ))}
+            {(Object.entries(STATUS_LABELS) as [keyof typeof STATUS_COLORS, string][]).map(
+              ([status, label]) => (
+                <span key={status} className="flex items-center gap-1">
+                  <span
+                    className="w-3 h-3 rounded-full inline-block"
+                    style={{ backgroundColor: STATUS_COLORS[status] }}
+                  />
+                  {label}
+                </span>
+              )
+            )}
           </div>
         </div>
 
-        {/* Map */}
-        <div className="flex-1 relative">
-          <APIProvider apiKey={MAPS_API_KEY}>
-            <Map
-              defaultCenter={DEFAULT_CENTER}
-              defaultZoom={15}
-              mapId="emergo-map"
+        {/* Map + detail panel row */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Map */}
+          <div className="flex-1 relative">
+            <MapContainer
+              center={DEFAULT_CENTER}
+              zoom={DEFAULT_ZOOM}
               style={{ width: '100%', height: '100%' }}
+              zoomControl={true}
             >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <MapFlyTo coords={selectedCoords} />
+
               {incidents.map((incident) => {
                 const lat = incident.location?.latitude;
                 const lng = incident.location?.longitude;
@@ -91,22 +101,36 @@ export default function MapPage() {
                 const isSelected = selected?.id === incident.id;
 
                 return (
-                  <AdvancedMarker
+                  <CircleMarker
                     key={incident.id}
-                    position={{ lat, lng }}
-                    onClick={() => setSelected(incident)}
+                    center={[lat, lng]}
+                    radius={isSelected ? 14 : 10}
+                    pathOptions={{
+                      color: isSelected ? '#111' : color,
+                      fillColor: color,
+                      fillOpacity: incident.status === 'resolved' ? 0.4 : 0.85,
+                      weight: isSelected ? 3 : 2,
+                    }}
+                    eventHandlers={{
+                      click: () => setSelected(incident),
+                    }}
                   >
-                    <Pin
-                      background={color}
-                      borderColor={isSelected ? '#111' : color}
-                      glyphColor="#fff"
-                      scale={isSelected ? 1.4 : 1.0}
-                    />
-                  </AdvancedMarker>
+                    <Popup>
+                      <div className="text-sm">
+                        <p className="font-semibold">{STATUS_LABELS[incident.status]}</p>
+                        <p className="text-gray-500 text-xs">
+                          {formatRelativeTime(incident.reportedAt as Timestamp)}
+                        </p>
+                        {incident.description && (
+                          <p className="mt-1">{incident.description}</p>
+                        )}
+                      </div>
+                    </Popup>
+                  </CircleMarker>
                 );
               })}
-            </Map>
-          </APIProvider>
+            </MapContainer>
+          </div>
 
           {/* Detail panel */}
           {selected && (
@@ -115,6 +139,7 @@ export default function MapPage() {
               uid={uid!}
               userRole={userDoc?.role ?? 'tanod'}
               onClose={() => setSelected(null)}
+              isPanel
             />
           )}
         </div>
