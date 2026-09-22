@@ -17,6 +17,7 @@ import LoginPage from './pages/LoginPage';
 import MapPage from './pages/MapPage';
 import IncidentsPage from './pages/IncidentsPage';
 import AdminPage from './pages/AdminPage';
+import DevLoginPage from './pages/DevLoginPage';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { uid, userDoc, loading, refresh } = useAuth();
@@ -45,6 +46,7 @@ export default function App() {
     <BrowserRouter>
       <Toaster position="top-right" />
       <Routes>
+        <Route path="/dev-login" element={<DevLoginPage onLogin={() => window.location.replace('/')} />} />
         <Route path="/" element={<AuthGuard><MapPage /></AuthGuard>} />
         <Route path="/incidents" element={<AuthGuard><IncidentsPage /></AuthGuard>} />
         <Route path="/admin" element={<AuthGuard><AdminPage /></AuthGuard>} />
