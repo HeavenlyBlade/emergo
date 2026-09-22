@@ -18,6 +18,7 @@ import OtpVerifyScreen from '../screens/OtpVerifyScreen';
 import DisplayNameSetupScreen from '../screens/DisplayNameSetupScreen';
 import HomeScreen from '../screens/HomeScreen';
 import AlertScreen from '../screens/AlertScreen';
+import TanodScreen from '../screens/TanodScreen';
 import { AuthStackParamList, AppStackParamList } from '../types';
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -42,6 +43,7 @@ function AppNavigator() {
     <AppStack.Navigator screenOptions={{ headerShown: false }}>
       <AppStack.Screen name="Home" component={HomeScreen} />
       <AppStack.Screen name="Alert" component={AlertScreen} />
+      <AppStack.Screen name="Tanod" component={TanodScreen} />
     </AppStack.Navigator>
   );
 }

@@ -26,8 +26,10 @@ export default function HomeScreen({ navigation }: Props) {
     if (!userDoc) return;
     if (userDoc.role === 'resident') {
       navigation.replace('Alert');
+    } else if (userDoc.role === 'tanod') {
+      navigation.replace('Tanod');
     }
-    // Officials and tanods stay here until Dashboard is built in Module 7
+    // Officials stay here until dashboard is built — they use the web dashboard
   }, [userDoc]);
 
   const handleSignOut = async () => {
@@ -47,8 +49,8 @@ export default function HomeScreen({ navigation }: Props) {
         Role: <Text style={styles.roleBadge}>{userDoc?.role}</Text>
       </Text>
       <Text style={styles.note}>
-        {userDoc?.role === 'official' || userDoc?.role === 'tanod'
-          ? 'Dashboard coming in Module 7'
+        {userDoc?.role === 'official'
+          ? 'Use the Emergo web dashboard on a PC or laptop to manage incidents.'
           : 'Loading...'}
       </Text>
       <TouchableOpacity style={styles.signOut} onPress={handleSignOut}>

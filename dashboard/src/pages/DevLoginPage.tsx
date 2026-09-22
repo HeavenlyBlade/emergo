@@ -9,7 +9,7 @@
  */
 
 import { useState } from 'react';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, addDoc, collection, serverTimestamp, GeoPoint } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import type { UserRole } from '../types';
 
@@ -19,10 +19,79 @@ const TEST_ACCOUNTS: { label: string; role: UserRole; uid: string; name: string 
   { label: '👤 Resident', role: 'resident', uid: 'dev_resident_001', name: 'Dev Resident' },
 ];
 
+// Seed incidents around Barangay Marketview, Lucena City
+const SEED_INCIDENTS = [
+  {
+    status: 'unverified',
+    reportedBy: 'dev_resident_001',
+    location: new GeoPoint(13.9371, 121.6172),
+    description: 'Fire reported near market stalls',
+  },
+  {
+    status: 'verified',
+    reportedBy: 'dev_resident_001',
+    location: new GeoPoint(13.9380, 121.6180),
+    description: 'Medical emergency — elderly collapsed',
+    verifiedBy: 'dev_official_001',
+  },
+  {
+    status: 'resolved',
+    reportedBy: 'dev_resident_001',
+    location: new GeoPoint(13.9365, 121.6168),
+    description: 'Flooding on main street',
+    verifiedBy: 'dev_official_001',
+  },
+  {
+    status: 'unverified',
+    reportedBy: 'dev_resident_001',
+    location: new GeoPoint(13.9376, 121.6185),
+    description: 'Suspicious persons near barangay hall',
+  },
+  {
+    status: 'verified',
+    reportedBy: 'dev_resident_001',
+    location: new GeoPoint(13.9368, 121.6175),
+    description: 'Accident — motorcycle collision',
+    verifiedBy: 'dev_official_001',
+  },
+];
+
 const SESSION_KEY = 'emergo_dashboard_uid';
 
 export default function DevLoginPage({ onLogin }: { onLogin: () => void }) {
   const [loading, setLoading] = useState<string | null>(null);
+  const [seeded, setSeeded] = useState(false);
+
+  const handleSeed = async () => {
+    setLoading('seed');
+    try {
+      // Ensure resident user exists first
+      const residentRef = doc(db, 'users', 'dev_resident_001');
+      const residentSnap = await getDoc(residentRef);
+      if (!residentSnap.exists()) {
+        await setDoc(residentRef, {
+          role: 'resident',
+          displayName: 'Dev Resident',
+          phoneNumber: '+630000000002',
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      for (const incident of SEED_INCIDENTS) {
+        await addDoc(collection(db, 'incidents'), {
+          ...incident,
+          reportedAt: serverTimestamp(),
+          verifiedAt: incident.verifiedBy ? serverTimestamp() : null,
+          resolvedAt: incident.status === 'resolved' ? serverTimestamp() : null,
+        });
+      }
+      setSeeded(true);
+    } catch (e: any) {
+      alert('Seed error: ' + e.message);
+    } finally {
+      setLoading(null);
+    }
+  };
 
   const handleLogin = async (account: typeof TEST_ACCOUNTS[0]) => {
     setLoading(account.uid);
@@ -88,6 +157,24 @@ export default function DevLoginPage({ onLogin }: { onLogin: () => void }) {
         <p className="text-center text-gray-600 text-xs mt-6">
           /dev-login — not linked from anywhere
         </p>
+
+        {/* Seed incidents */}
+        <div className="mt-4 border-t border-gray-700 pt-4">
+          <button
+            onClick={handleSeed}
+            disabled={loading === 'seed' || seeded}
+            className="w-full bg-blue-900 hover:bg-blue-800 text-blue-200 font-medium h-10 rounded-lg transition-colors disabled:opacity-50 text-sm"
+          >
+            {loading === 'seed'
+              ? 'Seeding...'
+              : seeded
+              ? '✅ Incidents seeded'
+              : '🌱 Seed test incidents (5)'}
+          </button>
+          <p className="text-gray-600 text-xs text-center mt-1">
+            Adds 5 test incidents around Barangay Marketview
+          </p>
+        </div>
       </div>
     </div>
   );
