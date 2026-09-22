@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { useIncidents } from '../hooks/useIncidents';
 import { useAuth } from '../hooks/useAuth';
-import { IncidentDocument, IncidentStatus } from '../types';
+import type { IncidentDocument, IncidentStatus } from '../types';
 import { STATUS_BG, STATUS_LABELS, formatRelativeTime, formatFullDate } from '../utils/incidentUtils';
 import IncidentDetailPanel from '../components/IncidentDetailPanel';
 import Sidebar from '../components/Sidebar';

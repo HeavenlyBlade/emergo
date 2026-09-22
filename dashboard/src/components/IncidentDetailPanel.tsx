@@ -12,7 +12,7 @@
 import { useState } from 'react';
 import { X, MapPin, Clock, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { IncidentDocument, UserRole } from '../types';
+import type { IncidentDocument, UserRole } from '../types';
 import { verifyIncident, resolveIncident } from '../services/incidentService';
 import { STATUS_BG, STATUS_LABELS, formatFullDate } from '../utils/incidentUtils';
 

@@ -5,7 +5,7 @@
 import { Link } from 'react-router-dom';
 import { Map, List, BarChart2, LogOut } from 'lucide-react';
 import { signOut } from '../services/authService';
-import { UserDocument } from '../types';
+import type { UserDocument } from '../types';
 
 interface Props {
   active: 'map' | 'incidents' | 'admin';

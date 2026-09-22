@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { getStoredSession, getUserDocument } from '../services/authService';
 import { db } from '../services/firebase';
-import { UserDocument } from '../types';
+import type { UserDocument } from '../types';
 
 interface UseAuthReturn {
   uid: string | null;

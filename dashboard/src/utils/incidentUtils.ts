@@ -1,4 +1,4 @@
-import { IncidentStatus, TimestampLike } from '../types';
+import type { IncidentStatus, TimestampLike } from '../types';
 
 export const STATUS_COLORS: Record<IncidentStatus, string> = {
   unverified: '#F59E0B',

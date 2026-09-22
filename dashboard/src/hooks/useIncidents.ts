@@ -10,7 +10,7 @@ import {
   query,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { IncidentDocument } from '../types';
+import type { IncidentDocument } from '../types';
 
 export function useIncidents() {
   const [incidents, setIncidents] = useState<IncidentDocument[]>([]);
