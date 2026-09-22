@@ -36,7 +36,7 @@ function MapFlyTo({ coords }: { coords: [number, number] | null }) {
 }
 
 export default function MapPage() {
-  const { incidents, loading } = useIncidents();
+  const { incidents } = useIncidents();
   const { uid, userDoc } = useAuth();
   const [selected, setSelected] = useState<IncidentDocument | null>(null);
 

@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { getStoredSession, getUserDocument } from '../services/authService';
+import { getStoredSession } from '../services/authService';
 import { db } from '../services/firebase';
 import type { UserDocument } from '../types';
 
