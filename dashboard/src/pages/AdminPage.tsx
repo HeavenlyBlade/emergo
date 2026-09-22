@@ -50,7 +50,7 @@ export default function AdminPage() {
     <div className="flex h-screen">
       <Sidebar active="admin" userDoc={userDoc} />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-gray-900">Records &amp; Admin</h1>

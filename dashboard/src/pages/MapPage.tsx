@@ -48,7 +48,7 @@ export default function MapPage() {
     <div className="flex h-screen">
       <Sidebar active="map" userDoc={userDoc} />
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Header */}
         <div className="bg-white border-b px-6 py-4 flex items-center justify-between shrink-0">
           <div>
@@ -76,9 +76,9 @@ export default function MapPage() {
         </div>
 
         {/* Map + detail panel row */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden min-h-0">
           {/* Map */}
-          <div className="flex-1 relative">
+          <div className="flex-1 relative min-h-0 min-w-0">
             <MapContainer
               center={DEFAULT_CENTER}
               zoom={DEFAULT_ZOOM}

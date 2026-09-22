@@ -21,7 +21,7 @@ const NAV = [
 export default function Sidebar({ active, userDoc }: Props) {
   const handleSignOut = () => {
     signOut();
-    window.location.reload();
+    window.location.replace('/');
   };
 
   return (

@@ -34,7 +34,7 @@ export default function IncidentsPage() {
     <div className="flex h-screen">
       <Sidebar active="incidents" userDoc={userDoc} />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Header */}
         <div className="bg-white border-b px-6 py-4">
           <h1 className="text-xl font-bold text-gray-900">Incidents</h1>
