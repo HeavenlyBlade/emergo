@@ -1,5 +1,5 @@
 /**
- * Sidebar — shared navigation component
+ * Sidebar  Eshared navigation component
  */
 
 import { Link } from 'react-router-dom';

@@ -1,6 +1,10 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-emergo-red: #D32F2F;
+  --color-emergo-red-light: #EF5350;
+  --color-emergo-red-dark: #B71C1C;
+}
 
 * {
   box-sizing: border-box;

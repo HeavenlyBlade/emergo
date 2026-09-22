@@ -1,5 +1,4 @@
-import { Timestamp } from 'firebase/firestore';
-import { IncidentStatus } from '../types';
+import { IncidentStatus, TimestampLike } from '../types';
 
 export const STATUS_COLORS: Record<IncidentStatus, string> = {
   unverified: '#F59E0B',
@@ -19,7 +18,7 @@ export const STATUS_LABELS: Record<IncidentStatus, string> = {
   resolved: 'Resolved',
 };
 
-export function formatRelativeTime(ts: Timestamp | undefined): string {
+export function formatRelativeTime(ts: TimestampLike | undefined): string {
   if (!ts) return '';
   const date = ts.toDate();
   const now = new Date();
@@ -33,7 +32,7 @@ export function formatRelativeTime(ts: Timestamp | undefined): string {
   return `${days}d ago`;
 }
 
-export function formatFullDate(ts: Timestamp | undefined): string {
+export function formatFullDate(ts: TimestampLike | undefined): string {
   if (!ts) return '';
   return ts.toDate().toLocaleString('en-PH', {
     month: 'short', day: 'numeric', year: 'numeric',

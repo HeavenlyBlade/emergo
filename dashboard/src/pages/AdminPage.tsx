@@ -1,5 +1,5 @@
 /**
- * AdminPage — Module 9: Admin/Records
+ * AdminPage  EModule 9: Admin/Records
  *
  * Incident history with basic statistics and export.
  * Centralized record for future planning.
@@ -106,13 +106,13 @@ export default function AdminPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-gray-600">
-                        {formatFullDate(incident.reportedAt as any)}
+                        {formatFullDate(incident.reportedAt)}
                       </td>
                       <td className="px-4 py-3 text-gray-600 font-mono text-xs">
                         {incident.reportedBy.slice(-8)}
                       </td>
                       <td className="px-4 py-3 text-gray-600">
-                        {incident.description || '—'}
+                        {incident.description || ' E}
                       </td>
                     </tr>
                   ))

@@ -1,5 +1,5 @@
 /**
- * IncidentDetailPanel — Module 7 & 8
+ * IncidentDetailPanel  EModule 7 & 8
  *
  * Shows incident details and verify/resolve actions.
  *
@@ -15,7 +15,6 @@ import toast from 'react-hot-toast';
 import { IncidentDocument, UserRole } from '../types';
 import { verifyIncident, resolveIncident } from '../services/incidentService';
 import { STATUS_BG, STATUS_LABELS, formatFullDate } from '../utils/incidentUtils';
-import { Timestamp } from 'firebase/firestore';
 
 interface Props {
   incident: IncidentDocument;
@@ -105,8 +104,7 @@ export default function IncidentDetailPanel({
               rel="noreferrer"
               className="text-xs text-blue-600 hover:underline mt-1 block"
             >
-              Open in Google Maps →
-            </a>
+              Open in Google Maps ↁE            </a>
           )}
         </div>
 
@@ -116,18 +114,18 @@ export default function IncidentDetailPanel({
             <Clock size={14} /> Timeline
           </p>
           <div className="mt-1 space-y-1 text-xs text-gray-500">
-            <p>Reported: {formatFullDate(incident.reportedAt as Timestamp)}</p>
+            <p>Reported: {formatFullDate(incident.reportedAt)}</p>
             {incident.verifiedAt && (
-              <p>Verified: {formatFullDate(incident.verifiedAt as Timestamp)}</p>
+              <p>Verified: {formatFullDate(incident.verifiedAt)}</p>
             )}
             {incident.resolvedAt && (
-              <p>Resolved: {formatFullDate(incident.resolvedAt as Timestamp)}</p>
+              <p>Resolved: {formatFullDate(incident.resolvedAt)}</p>
             )}
           </div>
         </div>
       </div>
 
-      {/* Actions — Module 8: Incident Verification & Resolution */}
+      {/* Actions  EModule 8: Incident Verification & Resolution */}
       {canAct && incident.status !== 'resolved' && (
         <div className="border-t border-gray-100 p-4 space-y-2">
           {incident.status === 'unverified' && (

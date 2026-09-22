@@ -1,13 +1,13 @@
 /**
- * Emergo Dashboard — App root
+ * Emergo Dashboard  EApp root
  *
  * Routes:
- *   /           → MapPage (Module 6)
- *   /incidents  → IncidentsPage (Module 7)
- *   /admin      → AdminPage (Module 9)
+ *   /           ↁEMapPage (Module 6)
+ *   /incidents  ↁEIncidentsPage (Module 7)
+ *   /admin      ↁEAdminPage (Module 9)
  *
- * Auth guard: unauthenticated users → LoginPage
- * Officials/tanods only — residents are redirected back to login
+ * Auth guard: unauthenticated users ↁELoginPage
+ * Officials/tanods only  Eresidents are redirected back to login
  */
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';

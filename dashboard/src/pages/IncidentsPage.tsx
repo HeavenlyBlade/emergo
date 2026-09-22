@@ -1,5 +1,5 @@
 /**
- * IncidentsPage — Module 7: Dashboard List & Detail Panel
+ * IncidentsPage  EModule 7: Dashboard List & Detail Panel
  *
  * Filterable incident list with real-time updates.
  * Clicking an incident opens the detail panel with verify/resolve actions.
@@ -84,14 +84,14 @@ export default function IncidentsPage() {
                       {STATUS_LABELS[incident.status]}
                     </span>
                     <span className="text-xs text-gray-400">
-                      {formatRelativeTime(incident.reportedAt as any)}
+                      {formatRelativeTime(incident.reportedAt)}
                     </span>
                   </div>
                   <p className="text-sm text-gray-700 font-medium">
                     {incident.description || 'Emergency alert'}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    {formatFullDate(incident.reportedAt as any)}
+                    {formatFullDate(incident.reportedAt)}
                   </p>
                 </button>
               ))}

@@ -1,7 +1,7 @@
 /**
- * MapPage — Module 6: Dashboard Live Map
+ * MapPage  EModule 6: Dashboard Live Map
  *
- * Uses Leaflet + OpenStreetMap — completely free, no API key needed.
+ * Uses Leaflet + OpenStreetMap  Ecompletely free, no API key needed.
  *
  * Real-time Firestore listener on incidents collection.
  * Status-differentiated pins:
@@ -21,7 +21,6 @@ import { IncidentDocument } from '../types';
 import { STATUS_COLORS, STATUS_LABELS, formatRelativeTime } from '../utils/incidentUtils';
 import IncidentDetailPanel from '../components/IncidentDetailPanel';
 import Sidebar from '../components/Sidebar';
-import { Timestamp } from 'firebase/firestore';
 
 // Center on Barangay Marketview, Lucena City
 const DEFAULT_CENTER: [number, number] = [13.9374, 121.6175];
@@ -119,7 +118,7 @@ export default function MapPage() {
                       <div className="text-sm">
                         <p className="font-semibold">{STATUS_LABELS[incident.status]}</p>
                         <p className="text-gray-500 text-xs">
-                          {formatRelativeTime(incident.reportedAt as Timestamp)}
+                          {formatRelativeTime(incident.reportedAt)}
                         </p>
                         {incident.description && (
                           <p className="mt-1">{incident.description}</p>

@@ -1,5 +1,5 @@
 /**
- * LoginPage — Phone OTP login for officials and tanods
+ * LoginPage  EPhone OTP login for officials and tanods
  */
 
 import { useState } from 'react';

@@ -1,9 +1,11 @@
 /**
  * Shared TypeScript types for Emergo Dashboard
  * Must match mobile/src/types/index.ts exactly.
+ *
+ * Note: We use plain objects for Firestore special types (GeoPoint, Timestamp)
+ * to avoid circular import issues with firebase/firestore in Vite.
+ * At runtime these are still Firestore GeoPoint/Timestamp instances.
  */
-
-import { Timestamp, GeoPoint } from 'firebase/firestore';
 
 export type UserRole = 'resident' | 'official' | 'tanod';
 
@@ -12,20 +14,29 @@ export interface UserDocument {
   role: UserRole;
   displayName: string;
   phoneNumber: string;
-  createdAt: Timestamp;
+  createdAt: { toDate: () => Date };
   expoPushToken?: string;
 }
 
 export type IncidentStatus = 'unverified' | 'verified' | 'resolved';
 
+export interface GeoPointLike {
+  latitude: number;
+  longitude: number;
+}
+
+export interface TimestampLike {
+  toDate: () => Date;
+}
+
 export interface IncidentDocument {
   id: string;
   status: IncidentStatus;
-  reportedAt: Timestamp;
+  reportedAt: TimestampLike;
   reportedBy: string;
-  location: GeoPoint;
+  location: GeoPointLike;
   description?: string;
   verifiedBy?: string;
-  verifiedAt?: Timestamp;
-  resolvedAt?: Timestamp;
+  verifiedAt?: TimestampLike;
+  resolvedAt?: TimestampLike;
 }
