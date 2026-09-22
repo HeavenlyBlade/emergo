@@ -1,9 +1,5 @@
 /**
  * incidentService — Dashboard incident verification and resolution
- *
- * Role gate: only officials can verify. Enforced in Firestore rules
- * AND here for defense-in-depth.
- * Race condition: verifyIncident uses a Firestore transaction.
  */
 
 import {
@@ -15,10 +11,9 @@ import {
   query,
   orderBy,
   getDocs,
-  Timestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { IncidentDocument } from '../types';
+import type { IncidentDocument } from '../types';
 
 export async function verifyIncident(
   incidentId: string,
@@ -51,8 +46,7 @@ export async function resolveIncident(
   incidentId: string,
   officialUid: string
 ): Promise<void> {
-  const incidentRef = doc(db, 'incidents', incidentId);
-  await updateDoc(incidentRef, {
+  await updateDoc(doc(db, 'incidents', incidentId), {
     status: 'resolved',
     resolvedBy: officialUid,
     resolvedAt: serverTimestamp(),
@@ -60,10 +54,7 @@ export async function resolveIncident(
 }
 
 export async function getAllIncidents(): Promise<IncidentDocument[]> {
-  const q = query(
-    collection(db, 'incidents'),
-    orderBy('reportedAt', 'desc')
-  );
+  const q = query(collection(db, 'incidents'), orderBy('reportedAt', 'desc'));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() })) as IncidentDocument[];
 }
