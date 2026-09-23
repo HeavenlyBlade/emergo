@@ -16,6 +16,9 @@ export interface UserDocument {
   phoneNumber: string;
   createdAt: { toDate: () => Date };
   expoPushToken?: string;
+  // Dashboard login credentials (officials and tanods only)
+  username?: string;
+  passwordHash?: string;
 }
 
 export type IncidentStatus = 'unverified' | 'verified' | 'resolved';

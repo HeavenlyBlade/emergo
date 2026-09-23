@@ -1,19 +1,19 @@
 /**
- * LoginPage — Phone OTP login for officials and tanods
+ * LoginPage — Username/password login for officials and tanods
  * Background: seamless crossfade between bg-1.mp4, bg-2.mp4, bg-3.mp4
- * Two video elements swap opacity to eliminate the grey flash between clips.
  */
 
 import { useState, useRef, useEffect } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { sendOtp, confirmOtp } from '../services/authService';
+import { signInWithCredentials } from '../services/authService';
 
 const BG_VIDEOS = ['/bg-1.mp4', '/bg-2.mp4', '/bg-3.mp4'];
 
 export default function LoginPage({ onLogin }: { onLogin: () => void }) {
-  const [step, setStep] = useState<'phone' | 'otp'>('phone');
-  const [digits, setDigits] = useState('');
-  const [otp, setOtp] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const videoA = useRef<HTMLVideoElement>(null);
@@ -63,37 +63,18 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
     };
   }, []);
 
-  const phoneNumber = '+63' + digits;
-
-  const handleSendOtp = async () => {
-    if (digits.length !== 10 || !digits.startsWith('9')) {
-      toast.error('Enter a valid 10-digit Philippine mobile number.');
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username.trim() || !password.trim()) {
+      toast.error('Enter your username and password.');
       return;
     }
     setLoading(true);
     try {
-      await sendOtp(phoneNumber);
-      toast.success('Code sent!');
-      setStep('otp');
-    } catch (e: any) {
-      toast.error(e?.message ?? 'Failed to send code.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerify = async () => {
-    if (otp.length !== 6) { toast.error('Enter the 6-digit code.'); return; }
-    setLoading(true);
-    try {
-      const userDoc = await confirmOtp(phoneNumber, otp);
-      if (userDoc.role === 'resident') {
-        toast.error('This dashboard is for officials and tanods only.');
-        return;
-      }
+      await signInWithCredentials(username, password);
       onLogin();
     } catch (e: any) {
-      toast.error(e?.message ?? 'Verification failed.');
+      toast.error(e?.message ?? 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -112,7 +93,6 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
         playsInline
         preload="auto"
       />
-
       <video
         ref={videoB}
         className={sharedVideoClass}
@@ -133,61 +113,66 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
           </p>
         </div>
 
-        {step === 'phone' ? (
-          <>
+        <form onSubmit={handleLogin} className="space-y-4">
+          {/* Username */}
+          <div>
             <label className="block text-sm font-medium text-white/80 mb-1">
-              Mobile number
+              Username
             </label>
-            <div className="flex items-center bg-white/20 border border-white/30 rounded-lg px-3 h-12 mb-4">
-              <span className="text-white font-semibold mr-2">+63</span>
-              <input
-                type="tel"
-                maxLength={10}
-                value={digits}
-                onChange={(e) => setDigits(e.target.value.replace(/\D/g, ''))}
-                placeholder="9171234567"
-                className="flex-1 outline-none text-base bg-transparent text-white placeholder-white/40"
-                onKeyDown={(e) => e.key === 'Enter' && handleSendOtp()}
-                autoFocus
-              />
-            </div>
-            <button
-              onClick={handleSendOtp}
-              disabled={loading}
-              className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold h-12 rounded-lg disabled:opacity-60 transition-colors"
-            >
-              {loading ? 'Sending...' : 'Send verification code'}
-            </button>
-          </>
-        ) : (
-          <>
-            <p className="text-sm text-white/70 mb-4 text-center">
-              Code sent to <strong className="text-white">{phoneNumber}</strong>
-            </p>
             <input
-              type="number"
-              maxLength={6}
-              value={otp}
-              onChange={(e) => setOtp(e.target.value.slice(0, 6))}
-              placeholder="000000"
-              className="w-full bg-white/20 border border-white/30 rounded-lg h-14 text-center text-3xl font-bold tracking-widest outline-none mb-4 text-white placeholder-white/30"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="e.g. brgy_captain"
+              autoComplete="username"
               autoFocus
+              className="w-full bg-white/20 border border-white/30 rounded-lg px-3 h-12 text-white placeholder-white/40 outline-none focus:border-white/60 transition-colors"
             />
-            <button
-              onClick={handleVerify}
-              disabled={loading}
-              className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold h-12 rounded-lg disabled:opacity-60 transition-colors"
-            >
-              {loading ? 'Verifying...' : 'Verify'}
-            </button>
-            <button
-              onClick={() => setStep('phone')}
-              className="w-full mt-2 text-white/60 hover:text-white text-sm transition-colors"
-            >
-              Wrong number? Go back
-            </button>
-          </>
-        )}
+          </div>
+
+          {/* Password */}
+          <div>
+            <label className="block text-sm font-medium text-white/80 mb-1">
+              Password
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                className="w-full bg-white/20 border border-white/30 rounded-lg px-3 pr-10 h-12 text-white placeholder-white/40 outline-none focus:border-white/60 transition-colors"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold h-12 rounded-lg disabled:opacity-60 transition-colors mt-2"
+          >
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                Signing in...
+              </span>
+            ) : (
+              'Sign in'
+            )}
+          </button>
+        </form>
+
+        <p className="text-white/30 text-xs text-center mt-6">
+          For access, contact your barangay administrator.
+        </p>
       </div>
     </div>
   );

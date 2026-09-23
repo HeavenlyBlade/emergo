@@ -11,6 +11,7 @@
 import { useState } from 'react';
 import { doc, getDoc, setDoc, addDoc, collection, serverTimestamp, GeoPoint } from 'firebase/firestore';
 import { db } from '../services/firebase';
+import { createOfficialAccount } from '../services/authService';
 import type { UserRole } from '../types';
 
 const TEST_ACCOUNTS: { label: string; role: UserRole; uid: string; name: string }[] = [
@@ -175,7 +176,114 @@ export default function DevLoginPage({ onLogin }: { onLogin: () => void }) {
             Adds 5 test incidents around Barangay Marketview
           </p>
         </div>
+
+        {/* Create account */}
+        <CreateAccountForm />
+
+        <p className="text-center text-gray-600 text-xs mt-4">
+          /dev-login — not linked from anywhere
+        </p>
       </div>
+    </div>
+  );
+}
+
+// ─── Create Account Form ──────────────────────────────────────────────────────
+
+function CreateAccountForm() {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    username: '',
+    password: '',
+    role: 'official' as 'official' | 'tanod',
+    displayName: '',
+    phoneNumber: '',
+  });
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done'>('idle');
+
+  const handleCreate = async () => {
+    if (!form.username || !form.password || !form.displayName) {
+      alert('Fill in all fields.');
+      return;
+    }
+    setStatus('loading');
+    try {
+      await createOfficialAccount(
+        form.username,
+        form.password,
+        form.role,
+        form.displayName,
+        form.phoneNumber || '+630000000000'
+      );
+      setStatus('done');
+      setForm({ username: '', password: '', role: 'official', displayName: '', phoneNumber: '' });
+    } catch (e: any) {
+      alert('Error: ' + e.message);
+      setStatus('idle');
+    }
+  };
+
+  return (
+    <div className="mt-4 border-t border-gray-700 pt-4">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full bg-emerald-900 hover:bg-emerald-800 text-emerald-200 font-medium h-10 rounded-lg transition-colors text-sm"
+      >
+        {open ? 'Hide' : '👤 Create official / tanod account'}
+      </button>
+
+      {open && (
+        <div className="mt-3 space-y-2">
+          <input
+            type="text"
+            placeholder="Username (e.g. brgy_captain)"
+            value={form.username}
+            onChange={(e) => setForm({ ...form, username: e.target.value })}
+            className="w-full bg-gray-700 text-white text-sm rounded-lg px-3 h-9 outline-none placeholder-gray-400"
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            className="w-full bg-gray-700 text-white text-sm rounded-lg px-3 h-9 outline-none placeholder-gray-400"
+          />
+          <input
+            type="text"
+            placeholder="Full name (e.g. Juan dela Cruz)"
+            value={form.displayName}
+            onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+            className="w-full bg-gray-700 text-white text-sm rounded-lg px-3 h-9 outline-none placeholder-gray-400"
+          />
+          <input
+            type="text"
+            placeholder="Phone number (optional, e.g. +639171234567)"
+            value={form.phoneNumber}
+            onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
+            className="w-full bg-gray-700 text-white text-sm rounded-lg px-3 h-9 outline-none placeholder-gray-400"
+          />
+          <select
+            value={form.role}
+            onChange={(e) => setForm({ ...form, role: e.target.value as 'official' | 'tanod' })}
+            className="w-full bg-gray-700 text-white text-sm rounded-lg px-3 h-9 outline-none"
+          >
+            <option value="official">Official</option>
+            <option value="tanod">Tanod</option>
+          </select>
+          <button
+            onClick={handleCreate}
+            disabled={status === 'loading'}
+            className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-medium h-9 rounded-lg text-sm disabled:opacity-50"
+          >
+            {status === 'loading' ? 'Creating...' : status === 'done' ? '✅ Created!' : 'Create account'}
+          </button>
+          {status === 'done' && (
+            <p className="text-emerald-400 text-xs text-center">
+              Account created. They can now log in at the main dashboard.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

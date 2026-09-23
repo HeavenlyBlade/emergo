@@ -23,6 +23,8 @@ export interface UserDocument {
   phoneNumber: string;       // from Firebase Auth, stored on first login
   createdAt: Timestamp;
   expoPushToken?: string;    // stored on login for officials/tanods; used for fan-out
+  username?: string;         // dashboard login (officials/tanods only)
+  passwordHash?: string;     // SHA-256 hex, set by admin
 }
 
 /**
