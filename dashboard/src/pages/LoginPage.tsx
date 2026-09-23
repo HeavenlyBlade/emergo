@@ -1,6 +1,7 @@
 /**
  * LoginPage — Phone OTP login for officials and tanods
- * Background: looping video cycle through bg-1.mp4, bg-2.mp4, bg-3.mp4
+ * Background: seamless crossfade between bg-1.mp4, bg-2.mp4, bg-3.mp4
+ * Two video elements swap opacity to eliminate the grey flash between clips.
  */
 
 import { useState, useRef, useEffect } from 'react';
@@ -14,23 +15,55 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
   const [digits, setDigits] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
-  const [videoIndex, setVideoIndex] = useState(0);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const phoneNumber = '+63' + digits;
 
-  // Cycle to next video when current one ends
-  const handleVideoEnded = () => {
-    setVideoIndex((prev) => (prev + 1) % BG_VIDEOS.length);
-  };
+  const videoA = useRef<HTMLVideoElement>(null);
+  const videoB = useRef<HTMLVideoElement>(null);
+  const activeRef = useRef<'A' | 'B'>('A');
+  const indexRef = useRef(0);
 
-  // When videoIndex changes, load and play the new source
   useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    v.src = BG_VIDEOS[videoIndex];
-    v.load();
-    v.play().catch(() => {}); // autoplay may be blocked silently
-  }, [videoIndex]);
+    const a = videoA.current;
+    const b = videoB.current;
+    if (!a || !b) return;
+
+    a.src = BG_VIDEOS[0];
+    a.style.opacity = '1';
+    b.style.opacity = '0';
+    b.src = BG_VIDEOS[1];
+    b.load();
+
+    const handleEnded = () => {
+      const current = activeRef.current === 'A' ? a : b;
+      const next = activeRef.current === 'A' ? b : a;
+
+      indexRef.current = (indexRef.current + 1) % BG_VIDEOS.length;
+      const nextIndex = (indexRef.current + 1) % BG_VIDEOS.length;
+
+      next.style.transition = 'opacity 0.8s ease-in-out';
+      current.style.transition = 'opacity 0.8s ease-in-out';
+      next.play().catch(() => {});
+      next.style.opacity = '1';
+      current.style.opacity = '0';
+
+      activeRef.current = activeRef.current === 'A' ? 'B' : 'A';
+
+      setTimeout(() => {
+        current.src = BG_VIDEOS[nextIndex];
+        current.load();
+      }, 900);
+    };
+
+    a.addEventListener('ended', handleEnded);
+    b.addEventListener('ended', handleEnded);
+    a.play().catch(() => {});
+
+    return () => {
+      a.removeEventListener('ended', handleEnded);
+      b.removeEventListener('ended', handleEnded);
+    };
+  }, []);
+
+  const phoneNumber = '+63' + digits;
 
   const handleSendOtp = async () => {
     if (digits.length !== 10 || !digits.startsWith('9')) {
@@ -66,24 +99,31 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
     }
   };
 
-  return (
-    <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden">
+  const sharedVideoClass = 'absolute inset-0 w-full h-full object-cover';
 
-      {/* Background video */}
+  return (
+    <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden bg-black">
+
       <video
-        ref={videoRef}
-        className="absolute inset-0 w-full h-full object-cover"
-        src={BG_VIDEOS[0]}
-        autoPlay
+        ref={videoA}
+        className={sharedVideoClass}
+        style={{ opacity: 1, transition: 'opacity 0.8s ease-in-out' }}
         muted
         playsInline
-        onEnded={handleVideoEnded}
+        preload="auto"
       />
 
-      {/* Dark overlay */}
-      <div className="absolute inset-0 bg-black/60" />
+      <video
+        ref={videoB}
+        className={sharedVideoClass}
+        style={{ opacity: 0, transition: 'opacity 0.8s ease-in-out' }}
+        muted
+        playsInline
+        preload="auto"
+      />
 
-      {/* Card */}
+      <div className="absolute inset-0 bg-black/55" />
+
       <div className="relative z-10 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl shadow-2xl p-8 w-full max-w-sm">
         <div className="text-center mb-8">
           <span className="text-5xl">🚨</span>
