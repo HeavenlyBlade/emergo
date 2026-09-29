@@ -4,26 +4,31 @@
  * Option B offline behavior: if the device has no internet connection
  * at submission time, throw a clear error. No silent queueing.
  *
- * Security: reportedBy is always set to the current user's uid server-side.
- * Status starts as 'unverified' — only officials can set it to 'verified'.
+ * Role gate: verifyIncident and resolveIncident check the caller's role
+ * in Firestore before writing. Firestore security rules are the final gate,
+ * but this is defense-in-depth at the service layer.
  */
 
 import {
   collection,
   addDoc,
   doc,
+  getDoc,
   onSnapshot,
   query,
+  runTransaction,
+  updateDoc,
   where,
   orderBy,
   serverTimestamp,
   GeoPoint,
-  Unsubscribe,
+  type Unsubscribe,
 } from 'firebase/firestore';
 import NetInfo from '@react-native-community/netinfo';
 import { db } from './firebase';
 import { getCurrentLocation } from './locationService';
-import { IncidentDocument } from '../types';
+import { notifyOfficialsAndTanods } from './notificationService';
+import type { IncidentDocument } from '../types';
 
 // ─── Submit alert ─────────────────────────────────────────────────────────────
 
@@ -31,18 +36,14 @@ export async function submitEmergencyAlert(
   uid: string,
   description?: string
 ): Promise<string> {
-  // Option B — check connectivity before attempting submission
+  // Option B — block on no connection
   const netState = await NetInfo.fetch();
   if (!netState.isConnected) {
-    throw new Error(
-      'No connection. Move to an area with signal and try again.'
-    );
+    throw new Error('No connection. Move to an area with signal and try again.');
   }
 
-  // Get GPS location
   const coords = await getCurrentLocation();
 
-  // Create incident document
   const incidentRef = await addDoc(collection(db, 'incidents'), {
     status: 'unverified',
     reportedAt: serverTimestamp(),
@@ -51,16 +52,15 @@ export async function submitEmergencyAlert(
     description: description?.trim() ?? '',
   });
 
-  // Notify all officials and tanods via Expo Push (fire and forget)
-  const userSnap = await import('firebase/firestore').then(({ doc, getDoc }) =>
-    getDoc(doc(db, 'users', uid))
-  );
+  // Fetch reporter name for the notification
+  const userSnap = await getDoc(doc(db, 'users', uid));
   const reporterName = userSnap.exists()
-    ? userSnap.data().displayName ?? 'A resident'
+    ? (userSnap.data().displayName as string | undefined) ?? 'A resident'
     : 'A resident';
 
-  import('./notificationService').then(({ notifyOfficialsAndTanods }) => {
-    notifyOfficialsAndTanods(incidentRef.id, reporterName, coords).catch(() => {});
+  // Notify officials and tanods — fire and log, don't swallow silently
+  notifyOfficialsAndTanods(incidentRef.id, reporterName, coords).catch((err) => {
+    console.error('[incidentService] Push notification failed:', err);
   });
 
   return incidentRef.id;
@@ -68,10 +68,6 @@ export async function submitEmergencyAlert(
 
 // ─── Real-time listeners ──────────────────────────────────────────────────────
 
-/**
- * Subscribe to a resident's own incidents in real time.
- * Returns unsubscribe function — call in useEffect cleanup.
- */
 export function subscribeToMyIncidents(
   uid: string,
   callback: (incidents: IncidentDocument[]) => void
@@ -82,29 +78,42 @@ export function subscribeToMyIncidents(
     orderBy('reportedAt', 'desc')
   );
 
-  return onSnapshot(q, (snap) => {
-    const incidents = snap.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-    })) as IncidentDocument[];
-    callback(incidents);
-  });
+  return onSnapshot(
+    q,
+    (snap) => {
+      const incidents = snap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      })) as IncidentDocument[];
+      callback(incidents);
+    },
+    (err) => {
+      console.error('[incidentService] subscribeToMyIncidents error:', err);
+      callback([]);
+    }
+  );
 }
 
 // ─── Status transitions ───────────────────────────────────────────────────────
 
+async function assertOfficial(uid: string): Promise<void> {
+  const snap = await getDoc(doc(db, 'users', uid));
+  if (!snap.exists() || snap.data().role !== 'official') {
+    throw new Error('Unauthorized: only officials can perform this action.');
+  }
+}
+
 /**
- * Verify an incident — ONLY role == 'official' should call this.
- * Uses a Firestore transaction to prevent race conditions:
- * if two officials tap verify at the same time, only the first succeeds.
+ * Verify an incident — ONLY role == 'official'.
+ * Transaction prevents two officials verifying simultaneously.
  */
 export async function verifyIncident(
   incidentId: string,
   officialUid: string
 ): Promise<void> {
-  const { runTransaction, doc } = await import('firebase/firestore');
-  const incidentRef = doc(db, 'incidents', incidentId);
+  await assertOfficial(officialUid);
 
+  const incidentRef = doc(db, 'incidents', incidentId);
   await runTransaction(db, async (transaction) => {
     const snap = await transaction.get(incidentRef);
     if (!snap.exists()) throw new Error('Incident not found.');
@@ -113,7 +122,7 @@ export async function verifyIncident(
     if (current.status !== 'unverified') {
       throw new Error(
         current.status === 'verified'
-          ? `Already verified by another official.`
+          ? 'Already verified by another official.'
           : 'This incident has already been resolved.'
       );
     }
@@ -121,23 +130,31 @@ export async function verifyIncident(
     transaction.update(incidentRef, {
       status: 'verified',
       verifiedBy: officialUid,
-      verifiedAt: (await import('firebase/firestore')).serverTimestamp(),
+      verifiedAt: serverTimestamp(),
     });
   });
 }
 
 /**
- * Resolve an incident — ONLY role == 'official' should call this.
+ * Resolve an incident — ONLY role == 'official'.
+ * Transaction prevents resolving an already-resolved incident.
  */
 export async function resolveIncident(
   incidentId: string,
   officialUid: string
 ): Promise<void> {
-  const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
+  await assertOfficial(officialUid);
+
   const incidentRef = doc(db, 'incidents', incidentId);
-  await updateDoc(incidentRef, {
-    status: 'resolved',
-    resolvedBy: officialUid,
-    resolvedAt: serverTimestamp(),
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(incidentRef);
+    if (!snap.exists()) throw new Error('Incident not found.');
+    if (snap.data().status === 'resolved') throw new Error('Already resolved.');
+
+    transaction.update(incidentRef, {
+      status: 'resolved',
+      resolvedBy: officialUid,
+      resolvedAt: serverTimestamp(),
+    });
   });
 }

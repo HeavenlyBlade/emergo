@@ -1,11 +1,15 @@
 /**
  * incidentService — Dashboard incident verification and resolution
+ *
+ * Role gate: assertOfficial checks the caller's role before any write.
+ * Firestore security rules are the final gate — this is defense-in-depth.
+ * Both verifyIncident and resolveIncident use transactions for race-condition safety.
  */
 
 import {
   doc,
+  getDoc,
   runTransaction,
-  updateDoc,
   serverTimestamp,
   collection,
   query,
@@ -15,12 +19,20 @@ import {
 import { db } from './firebase';
 import type { IncidentDocument } from '../types';
 
+async function assertOfficial(uid: string): Promise<void> {
+  const snap = await getDoc(doc(db, 'users', uid));
+  if (!snap.exists() || snap.data().role !== 'official') {
+    throw new Error('Unauthorized: only officials can perform this action.');
+  }
+}
+
 export async function verifyIncident(
   incidentId: string,
   officialUid: string
 ): Promise<void> {
-  const incidentRef = doc(db, 'incidents', incidentId);
+  await assertOfficial(officialUid);
 
+  const incidentRef = doc(db, 'incidents', incidentId);
   await runTransaction(db, async (transaction) => {
     const snap = await transaction.get(incidentRef);
     if (!snap.exists()) throw new Error('Incident not found.');
@@ -46,10 +58,19 @@ export async function resolveIncident(
   incidentId: string,
   officialUid: string
 ): Promise<void> {
-  await updateDoc(doc(db, 'incidents', incidentId), {
-    status: 'resolved',
-    resolvedBy: officialUid,
-    resolvedAt: serverTimestamp(),
+  await assertOfficial(officialUid);
+
+  const incidentRef = doc(db, 'incidents', incidentId);
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(incidentRef);
+    if (!snap.exists()) throw new Error('Incident not found.');
+    if (snap.data().status === 'resolved') throw new Error('Already resolved.');
+
+    transaction.update(incidentRef, {
+      status: 'resolved',
+      resolvedBy: officialUid,
+      resolvedAt: serverTimestamp(),
+    });
   });
 }
 

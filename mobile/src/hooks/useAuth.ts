@@ -3,16 +3,14 @@
  *
  * On mount: checks AsyncStorage for a stored uid.
  * If found: loads the Firestore user document and subscribes to real-time updates.
- * If not found: user is not logged in.
- *
- * Exposes a refresh function so screens can trigger a reload after login.
+ * Push token is registered once after initial load, not on every snapshot.
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { getStoredSession, registerPushTokenIfNeeded } from '../services/authService';
 import { db } from '../services/firebase';
-import { UserDocument } from '../types';
+import type { UserDocument } from '../types';
 
 interface UseAuthReturn {
   uid: string | null;
@@ -26,9 +24,12 @@ export function useAuth(): UseAuthReturn {
   const [userDoc, setUserDoc] = useState<UserDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
+  const tokenRegistered = useRef(false);
 
-  // Call refresh() after login/logout to re-check session
-  const refresh = useCallback(() => setTick((t) => t + 1), []);
+  const refresh = useCallback(() => {
+    tokenRegistered.current = false; // allow re-registration after login
+    setTick((t) => t + 1);
+  }, []);
 
   useEffect(() => {
     let unsubscribeDoc: (() => void) | undefined;
@@ -44,22 +45,38 @@ export function useAuth(): UseAuthReturn {
         return;
       }
 
-      // Subscribe to real-time user document updates
       const userRef = doc(db, 'users', storedUid);
-      unsubscribeDoc = onSnapshot(userRef, (snap) => {
-        if (snap.exists()) {
-          const data = { uid: storedUid, ...snap.data() } as UserDocument;
-          setUserDoc(data);
-          // Register push token for officials/tanods on first load
-          registerPushTokenIfNeeded(storedUid, data.role).catch(() => {});
-        } else {
-          setUserDoc(null);
+      unsubscribeDoc = onSnapshot(
+        userRef,
+        (snap) => {
+          if (snap.exists()) {
+            const data = { uid: storedUid, ...snap.data() } as UserDocument;
+            setUserDoc(data);
+
+            // Register push token once per session, not on every snapshot update
+            if (!tokenRegistered.current) {
+              tokenRegistered.current = true;
+              registerPushTokenIfNeeded(storedUid, data.role).catch((err) => {
+                console.warn('[useAuth] Push token registration failed:', err);
+              });
+            }
+          } else {
+            // User doc was deleted — clear session
+            setUserDoc(null);
+          }
+          setLoading(false);
+        },
+        (err) => {
+          console.error('[useAuth] onSnapshot error:', err);
+          setLoading(false);
         }
-        setLoading(false);
-      });
+      );
     };
 
-    init();
+    init().catch((err) => {
+      console.error('[useAuth] init failed:', err);
+      setLoading(false);
+    });
 
     return () => {
       if (unsubscribeDoc) unsubscribeDoc();

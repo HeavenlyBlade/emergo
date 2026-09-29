@@ -29,7 +29,7 @@ export default function App() {
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#D32F2F',
         sound: 'default',
-      });
+      }).catch((err) => console.warn('[App] Failed to create notification channel:', err));
     }
   }, []);
 

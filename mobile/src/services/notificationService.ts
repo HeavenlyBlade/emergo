@@ -50,14 +50,16 @@ export async function registerPushToken(uid: string): Promise<void> {
 
   if (finalStatus !== 'granted') return;
 
-  // Get the push token — projectId required for standalone/dev builds
   const projectId =
     Constants.expoConfig?.extra?.eas?.projectId ??
     Constants.easConfig?.projectId;
 
-  const tokenData = projectId
-    ? await Notifications.getExpoPushTokenAsync({ projectId })
-    : await Notifications.getExpoPushTokenAsync();
+  if (!projectId) {
+    console.warn('[notificationService] EAS projectId not found — push token registration skipped. Configure EAS in app.json.');
+    return;
+  }
+
+  const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
 
   const token = tokenData.data;
 
@@ -112,7 +114,7 @@ export async function notifyOfficialsAndTanods(
   const BATCH_SIZE = 100;
   for (let i = 0; i < messages.length; i += BATCH_SIZE) {
     const batch = messages.slice(i, i + BATCH_SIZE);
-    await fetch(EXPO_PUSH_URL, {
+    const response = await fetch(EXPO_PUSH_URL, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -121,5 +123,20 @@ export async function notifyOfficialsAndTanods(
       },
       body: JSON.stringify(batch),
     });
+
+    if (!response.ok) {
+      console.error('[notificationService] Expo Push API HTTP error:', response.status);
+      continue;
+    }
+
+    // Check per-token errors in the response body
+    const result = await response.json();
+    if (result?.data) {
+      result.data.forEach((item: { status: string; message?: string; details?: unknown }, idx: number) => {
+        if (item.status === 'error') {
+          console.error(`[notificationService] Push failed for token ${idx}:`, item.message, item.details);
+        }
+      });
+    }
   }
 }

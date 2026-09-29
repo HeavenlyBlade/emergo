@@ -22,14 +22,21 @@ export function useIncidents() {
       orderBy('reportedAt', 'desc')
     );
 
-    const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      })) as IncidentDocument[];
-      setIncidents(data);
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const data = snap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        })) as IncidentDocument[];
+        setIncidents(data);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('[useIncidents] onSnapshot error:', err);
+        setLoading(false);
+      }
+    );
 
     return () => unsub();
   }, []);

@@ -30,7 +30,7 @@ export default function HomeScreen({ navigation }: Props) {
       navigation.replace('Tanod');
     }
     // Officials stay here until dashboard is built — they use the web dashboard
-  }, [userDoc]);
+  }, [userDoc, navigation]);
 
   const handleSignOut = async () => {
     await signOut();

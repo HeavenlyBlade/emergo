@@ -14,7 +14,6 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   ScrollView,
   StyleSheet,
   Text,
@@ -24,33 +23,8 @@ import {
 import { Timestamp } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 import { submitEmergencyAlert, subscribeToMyIncidents } from '../services/incidentService';
-import { IncidentDocument } from '../types';
-
-const STATUS_COLORS: Record<string, string> = {
-  unverified: '#F59E0B',
-  verified: '#10B981',
-  resolved: '#9CA3AF',
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  unverified: 'Unverified',
-  verified: 'Verified',
-  resolved: 'Resolved',
-};
-
-function formatTime(ts: Timestamp | undefined): string {
-  if (!ts) return '';
-  const date = ts.toDate();
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const mins = Math.floor(diff / 60000);
-  const hrs = Math.floor(mins / 60);
-  const days = Math.floor(hrs / 24);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${days}d ago`;
-}
+import { STATUS_COLORS, STATUS_LABELS, formatRelativeTime } from '../utils/incidentUtils';
+import type { IncidentDocument } from '../types';
 
 export default function AlertScreen() {
   const { uid, userDoc } = useAuth();
@@ -139,7 +113,7 @@ export default function AlertScreen() {
                   {STATUS_LABELS[incident.status]}
                 </Text>
                 <Text style={styles.timeText}>
-                  {formatTime(incident.reportedAt as Timestamp)}
+                  {formatRelativeTime(incident.reportedAt as Timestamp)}
                 </Text>
               </View>
               {incident.description ? (

@@ -43,6 +43,7 @@ export interface IncidentDocument {
   description?: string;
   verifiedBy?: string;        // uid of the official who verified — only role == 'official'
   verifiedAt?: Timestamp;
+  resolvedBy?: string;        // uid of the official who resolved
   resolvedAt?: Timestamp;
 }
 

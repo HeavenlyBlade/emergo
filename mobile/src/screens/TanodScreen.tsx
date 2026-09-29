@@ -200,7 +200,7 @@ export default function TanodScreen() {
         renderItem={renderIncident}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={() => {}} />
+          <RefreshControl refreshing={loading} onRefresh={() => setFilter(filter)} />
         }
         ListEmptyComponent={
           <Text style={styles.empty}>

@@ -36,14 +36,17 @@ import { sendSms } from './smsService';
 
 const OTP_EXPIRY_MINUTES = 10;
 
-function generateCode(): string {
-  // Cryptographically random 6-digit code
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
+async function generateCode(): Promise<string> {
+  // Cryptographically secure 6-digit code using Web Crypto API
+  // Available in React Native 0.73+ via Hermes, and in all Expo SDK 50+ builds
+  const array = new Uint32Array(1);
+  crypto.getRandomValues(array);
+  const code = (100000 + (array[0] % 900000)).toString();
   return code;
 }
 
 export async function generateAndSendOtp(phoneNumber: string): Promise<void> {
-  const code = generateCode();
+  const code = await generateCode();
   const expiresAt = new Date();
   expiresAt.setMinutes(expiresAt.getMinutes() + OTP_EXPIRY_MINUTES);
 

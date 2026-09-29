@@ -11,7 +11,7 @@
 import { useState } from 'react';
 import { doc, getDoc, setDoc, addDoc, collection, serverTimestamp, GeoPoint } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { createOfficialAccount } from '../services/authService';
+import { createOfficialAccount, SESSION_KEY } from '../services/authService';
 import type { UserRole } from '../types';
 
 const TEST_ACCOUNTS: { label: string; role: UserRole; uid: string; name: string }[] = [
@@ -57,7 +57,7 @@ const SEED_INCIDENTS = [
   },
 ];
 
-const SESSION_KEY = 'emergo_dashboard_uid';
+// SESSION_KEY imported from authService — single source of truth
 
 export default function DevLoginPage({ onLogin }: { onLogin: () => void }) {
   const [loading, setLoading] = useState<string | null>(null);

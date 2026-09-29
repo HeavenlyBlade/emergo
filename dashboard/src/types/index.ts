@@ -41,5 +41,6 @@ export interface IncidentDocument {
   description?: string;
   verifiedBy?: string;
   verifiedAt?: TimestampLike;
+  resolvedBy?: string;
   resolvedAt?: TimestampLike;
 }

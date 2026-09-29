@@ -25,6 +25,7 @@ import { db } from './firebase';
 import type { UserDocument } from '../types';
 
 const SESSION_KEY = 'emergo_dashboard_uid';
+export { SESSION_KEY };
 
 // ─── Password hashing ─────────────────────────────────────────────────────────
 

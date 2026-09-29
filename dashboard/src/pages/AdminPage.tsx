@@ -22,6 +22,9 @@ export default function AdminPage() {
   };
 
   const handleExport = () => {
+    // RFC-4180 compliant CSV — quotes all fields to handle commas, quotes, and newlines
+    const escape = (v: string) => `"${String(v).replace(/"/g, '""')}"`;
+
     const rows = [
       ['ID', 'Status', 'Reported At', 'Reported By', 'Description', 'Verified By', 'Verified At', 'Resolved At'],
       ...incidents.map((i) => [
@@ -36,14 +39,15 @@ export default function AdminPage() {
       ]),
     ];
 
-    const csv = rows.map((r) => r.join(',')).join('\n');
+    const csv = rows.map((r) => r.map(escape).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `emergo-incidents-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
-    URL.revokeObjectURL(url);
+    // Delay revoke to ensure download starts before the URL is freed
+    setTimeout(() => URL.revokeObjectURL(url), 200);
   };
 
   return (

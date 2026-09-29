@@ -31,7 +31,7 @@ function MapFlyTo({ coords }: { coords: [number, number] | null }) {
   const map = useMap();
   useEffect(() => {
     if (coords) map.flyTo(coords, 17, { duration: 1 });
-  }, [coords]);
+  }, [coords, map]);
   return null;
 }
 

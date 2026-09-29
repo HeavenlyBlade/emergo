@@ -1,13 +1,16 @@
 /**
- * Emergo Dashboard  EApp root
+ * Emergo Dashboard — App root
  *
  * Routes:
- *   /           ↁEMapPage (Module 6)
- *   /incidents  ↁEIncidentsPage (Module 7)
- *   /admin      ↁEAdminPage (Module 9)
+ *   /           → MapPage (Module 6)
+ *   /incidents  → IncidentsPage (Module 7)
+ *   /admin      → AdminPage (Module 9)
  *
- * Auth guard: unauthenticated users ↁELoginPage
- * Officials/tanods only  Eresidents are redirected back to login
+ * Auth guard: unauthenticated users → LoginPage
+ * Officials/tanods only — residents are redirected back to login
+ *
+ * /dev-login is only registered when import.meta.env.DEV === true.
+ * It is completely absent from the production bundle.
  */
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -17,6 +20,9 @@ import LoginPage from './pages/LoginPage';
 import MapPage from './pages/MapPage';
 import IncidentsPage from './pages/IncidentsPage';
 import AdminPage from './pages/AdminPage';
+
+// Conditionally import DevLoginPage — tree-shaken out of production builds
+// import.meta.env.DEV is a compile-time constant in Vite
 import DevLoginPage from './pages/DevLoginPage';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -46,7 +52,13 @@ export default function App() {
     <BrowserRouter>
       <Toaster position="top-right" />
       <Routes>
-        <Route path="/dev-login" element={<DevLoginPage onLogin={() => window.location.replace('/')} />} />
+        {/* /dev-login only active in development — route does not exist in production */}
+        {import.meta.env.DEV && (
+          <Route
+            path="/dev-login"
+            element={<DevLoginPage onLogin={() => window.location.replace('/')} />}
+          />
+        )}
         <Route path="/" element={<AuthGuard><MapPage /></AuthGuard>} />
         <Route path="/incidents" element={<AuthGuard><IncidentsPage /></AuthGuard>} />
         <Route path="/admin" element={<AuthGuard><AdminPage /></AuthGuard>} />
