@@ -28,6 +28,7 @@
     },
     "android": {
       "package": "com.emergo.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#D32F2F",
         "foregroundImage": "./assets/android-icon-foreground.png",
