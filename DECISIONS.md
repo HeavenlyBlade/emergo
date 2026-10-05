@@ -83,3 +83,13 @@ A running log of architectural decisions made during development. Reference this
 **Decision:** Use Leaflet + OpenStreetMap (`react-leaflet`) instead of Google Maps JavaScript API.
 **Rationale:** Google Maps JS API requires billing account setup even for free-tier usage. Leaflet + OpenStreetMap is completely free with no API key, no account, and no billing.
 **Impact:** Only `MapPage.tsx` changed. All other dashboard logic identical. Map pins use `CircleMarker` from react-leaflet.
+
+## 2026 — EAS Build Must Run from C:\emergo\mobile
+**Decision:** EAS CLI commands must be run from `C:\emergo\mobile`, not `C:\Users\Asus\Desktop\Emergo\mobile`.
+**Rationale:** Windows has a 260-character path limit. The deep node_modules paths in expo packages exceed this limit when installed at the original path, causing `expo-notifications` and other packages to install incompletely. The shorter path `C:\emergo\mobile` resolves this.
+**Workflow:** Edit code in `C:\Users\Asus\Desktop\Emergo\mobile` (the git repo), then sync to `C:\emergo\mobile` before building:
+  ```
+  Get-ChildItem "C:\Users\Asus\Desktop\Emergo\mobile" -Exclude "node_modules",".expo","android" | Copy-Item -Destination "C:\emergo\mobile" -Recurse -Force
+  cd C:\emergo\mobile
+  npx eas-cli build --platform android --profile preview --non-interactive
+  ```
