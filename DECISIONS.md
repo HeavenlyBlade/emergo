@@ -1,6 +1,16 @@
 # DECISIONS.md
 A running log of architectural decisions made during development. Reference this in Chapter 4 (Results) of your thesis when explaining choices to your panel.
 
+## Current State (as of this audit)
+
+This section supersedes any conflicting entries below. The entries below are preserved for the decision history.
+
+- **Mobile auth:** Custom OTP via Android SMS Gateway (SMS API PH) + Firestore. The OTP code is generated in-app, stored in `otp_codes/{phone}` in Firestore, sent via the SMS Gateway, and verified client-side. See `mobile/src/services/otpService.ts`.
+- **Dashboard auth:** Username/password with PBKDF2-SHA256 client-side KDF (100,000 iterations, random salt per user). See `dashboard/src/services/authService.ts`. A Firebase Anonymous Auth session is established after successful password verification — the session gate is `auth.currentUser`, not a raw localStorage uid.
+- **Maps:** Leaflet + OpenStreetMap (`react-leaflet`). No Google Maps, no billing. See `dashboard/src/pages/MapPage.tsx`.
+- **Cloud Functions:** Not used. The project runs on the free Firebase Spark plan. Expo Push API handles push fan-out from the resident device. SMS is sent from the mobile app via the Android SMS Gateway.
+- **Firestore rules:** `firestore.rules` at the repo root enforces RBAC — residents, officials/tanods, and admin roles. The `otp_codes` collection is locked to server-side only (no client reads/writes); this means the current client-side OTP verification flow requires a Cloud Function for proper security.
+
 ---
 
 ## 2026 — Offline Behavior (Module 2: Emergency Alert)

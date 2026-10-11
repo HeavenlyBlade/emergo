@@ -19,6 +19,7 @@ export interface UserDocument {
   // Dashboard login credentials (officials and tanods only)
   username?: string;
   passwordHash?: string;
+  passwordSalt?: string; // hex-encoded PBKDF2 salt; required alongside passwordHash
 }
 
 export type IncidentStatus = 'unverified' | 'verified' | 'resolved';

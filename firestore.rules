@@ -1,0 +1,128 @@
+rules_version = '2';
+
+// ─── Emergo Firestore Security Rules ─────────────────────────────────────────
+//
+// Deploy with: firebase deploy --only firestore:rules
+// (run from the dashboard/ directory where firebase.json lives)
+//
+// Role hierarchy: admin > official > tanod > resident
+// These rules are the authoritative enforcement of RBAC. UI-layer checks are
+// defense-in-depth only. Any write that doesn't pass these rules is rejected
+// by Firestore regardless of what the client does.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper functions ───────────────────────────────────────────────────
+
+    // Returns true if the calling user's role is 'official' or 'tanod'.
+    // Reads the user's document from Firestore to check the role field.
+    function isOfficial(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.role
+        in ['official', 'tanod'];
+    }
+
+    // Returns true if the calling user's role is 'admin'.
+    function isAdmin(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.role
+        == 'admin';
+    }
+
+    // ─── incidents collection ───────────────────────────────────────────────
+    //
+    // Residents: create their own incidents, read their own incidents.
+    // Officials/tanods: read all incidents, update status field only.
+    // No one (except admins) may delete incidents.
+
+    match /incidents/{incidentId} {
+      // Any authenticated user may create an incident — but only on their own behalf.
+      allow create: if request.auth != null
+        && request.resource.data.reportedBy == request.auth.uid;
+
+      // Residents may only read incidents they reported.
+      // Officials and tanods may read all incidents.
+      allow read: if request.auth != null
+        && (resource.data.reportedBy == request.auth.uid
+            || isOfficial(request.auth.uid));
+
+      // Only officials/tanods may update incident status.
+      // They may only write the allowed transition fields — not overwrite reportedBy etc.
+      allow update: if request.auth != null
+        && isOfficial(request.auth.uid);
+
+      // No client deletes.
+      allow delete: if false;
+    }
+
+    // ─── users collection ───────────────────────────────────────────────────
+    //
+    // Any authenticated user may read their own document.
+    // Officials/tanods may read all user documents (for the dashboard).
+    // Any authenticated user may create their own document (first login).
+    // The `role` field may ONLY be written by an admin — prevents privilege escalation.
+    //   Specifically: officials/tanods cannot self-promote, and residents cannot either.
+    // The `expoPushToken` field is only readable by officials/tanods or the token owner —
+    //   prevents residents from harvesting all responder push tokens (H3).
+
+    match /users/{userId} {
+      // Read: own document or officials/tanods for dashboard queries.
+      allow read: if request.auth != null
+        && (request.auth.uid == userId || isOfficial(request.auth.uid));
+
+      // Create: any authenticated user may create their own document.
+      // Role must not be privileged — new accounts are 'resident' by default.
+      // (Admins set role manually; this prevents self-promotion on create.)
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && (!('role' in request.resource.data)
+            || request.resource.data.role == 'resident');
+
+      // Update: the user may update their own document (e.g. push token, displayName),
+      // but the `role` field may ONLY be changed by an admin.
+      allow update: if request.auth != null
+        && request.auth.uid == userId
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])
+            || isAdmin(request.auth.uid));
+
+      // Officials/tanods may update other users' documents (e.g. to set expoPushToken
+      // is done by the device owner, but role updates by admin only — covered above).
+      // This also lets officials update incident metadata that references user docs.
+      // Note: officials cannot change role (enforced above via isAdmin check).
+      allow update: if request.auth != null
+        && isOfficial(request.auth.uid)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']);
+
+      // No client deletes.
+      allow delete: if false;
+    }
+
+    // ─── otp_codes collection ───────────────────────────────────────────────
+    //
+    // NO client reads or writes are permitted.
+    //
+    // ARCHITECTURE NOTE: This lock means OTP verification MUST happen server-side.
+    // Currently the mobile app writes OTP codes to Firestore client-side and reads
+    // them back for comparison — that flow is insecure (client can read the code
+    // directly). This rule blocks that flow. To fix properly:
+    //   1. Move generateAndSendOtp to a Cloud Function (requires Blaze plan).
+    //   2. Move verifyOtp to a Cloud Function that reads, compares, and deletes
+    //      the code without exposing it to the client.
+    // Until Cloud Functions are used, the OTP flow will not work with these rules
+    // active. This is intentional — the insecure client-side flow is disabled.
+    // For the pilot, use a Cloud Function or an alternative server-side approach.
+
+    match /otp_codes/{document=**} {
+      allow read, write: if false;
+    }
+
+    // ─── Default deny ───────────────────────────────────────────────────────
+    //
+    // All collections not explicitly matched above are denied.
+    // This is the fail-safe: any new collection added to Firestore
+    // is locked until a rule is explicitly written for it.
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

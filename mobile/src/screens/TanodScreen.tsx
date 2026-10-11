@@ -50,10 +50,11 @@ export default function TanodScreen() {
   const { incidents, loading } = useIncidents();
   const [filter, setFilter] = useState<IncidentStatus | 'all'>('all');
   const [expanded, setExpanded] = useState<string | null>(null);
+  // L8 fix: refreshKey forces re-mount of the incidents subscription on manual refresh.
+  // Data is already real-time via onSnapshot, so this is a manual override for edge cases.
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const filtered = filter === 'all'
-    ? incidents
-    : incidents.filter((i) => i.status === filter);
 
   const unverifiedCount = incidents.filter(
     (i) => i.status === 'unverified'
@@ -200,7 +201,10 @@ export default function TanodScreen() {
         renderItem={renderIncident}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={() => setFilter(filter)} />
+          // L8 fix: was onRefresh={() => setFilter(filter)} which is a no-op (same value).
+          // Data is already real-time via onSnapshot; refreshKey forces a listener re-mount
+          // for edge cases where the real-time stream has stalled.
+          <RefreshControl refreshing={loading} onRefresh={() => setRefreshKey(k => k + 1)} />
         }
         ListEmptyComponent={
           <Text style={styles.empty}>

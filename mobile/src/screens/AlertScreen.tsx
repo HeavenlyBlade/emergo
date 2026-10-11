@@ -56,7 +56,12 @@ export default function AlertScreen() {
               );
             } catch (error: any) {
               // Option B: show clear error for offline or any failure
-              Alert.alert('Could not send alert', error?.message ?? 'Please try again.');
+              // M6 fix: GPS_TIMEOUT gets a clear user message
+              const message =
+                error?.message === 'GPS_TIMEOUT'
+                  ? 'Could not get your location. Please enable GPS or try again.'
+                  : error?.message ?? 'Please try again.';
+              Alert.alert('Could not send alert', message);
             } finally {
               setSubmitting(false);
             }

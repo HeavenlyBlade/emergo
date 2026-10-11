@@ -71,6 +71,13 @@ export async function registerPushToken(uid: string): Promise<void> {
 
 // ─── Fan-out ──────────────────────────────────────────────────────────────────
 
+// SECURITY TODO: Move this push fan-out to a Cloud Function. Currently any
+// resident can read all responder push tokens from Firestore (because this
+// query runs on the resident's device). Firestore rules in firestore.rules
+// restrict reads of users where role == 'official'/'tanod' to officials/tanods
+// only, which mitigates the token harvesting risk. However, a Cloud Function
+// is the proper long-term fix — the fan-out should originate server-side so
+// push tokens are never transmitted to the resident's device at all.
 export async function notifyOfficialsAndTanods(
   incidentId: string,
   reporterName: string,

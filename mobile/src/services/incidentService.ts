@@ -14,14 +14,17 @@ import {
   addDoc,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   query,
   runTransaction,
   updateDoc,
   where,
   orderBy,
+  limit,
   serverTimestamp,
   GeoPoint,
+  Timestamp,
   type Unsubscribe,
 } from 'firebase/firestore';
 import NetInfo from '@react-native-community/netinfo';
@@ -40,6 +43,21 @@ export async function submitEmergencyAlert(
   const netState = await NetInfo.fetch();
   if (!netState.isConnected) {
     throw new Error('No connection. Move to an area with signal and try again.');
+  }
+
+  // H4 fix: rate limit — prevent submitting more than one alert every 5 minutes
+  const fiveMinutesAgo = Timestamp.fromDate(
+    new Date(Date.now() - 5 * 60 * 1000)
+  );
+  const recentQuery = query(
+    collection(db, 'incidents'),
+    where('reportedBy', '==', uid),
+    where('reportedAt', '>', fiveMinutesAgo),
+    limit(1)
+  );
+  const recentSnap = await getDocs(recentQuery);
+  if (!recentSnap.empty) {
+    throw new Error('Please wait before submitting another alert.');
   }
 
   const coords = await getCurrentLocation();

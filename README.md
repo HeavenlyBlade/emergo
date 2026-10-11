@@ -11,9 +11,13 @@ A capstone thesis project built with Expo (React Native), React (Vite), and Fire
 emergo/
 ├── mobile/       # Expo/React Native app (residents, officials, tanods)
 ├── dashboard/    # React + Vite web dashboard (officials and tanods)
+├── source/       # Raw video assets for dashboard login background (not in git LFS — see M5)
+├── firestore.rules  # Firestore security rules (deploy with: firebase deploy --only firestore:rules)
 ├── DECISIONS.md  # Architectural decision log
 └── README.md
 ```
+
+Note: `functions/` is intentionally absent. Cloud Functions are not used (Spark plan). See DECISIONS.md.
 
 ## Stack
 - **Mobile:** Expo SDK, React Native, TypeScript, Firebase SDK, Expo Push Notifications

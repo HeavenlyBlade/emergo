@@ -1,7 +1,13 @@
 /**
  * useAuth — dashboard session and user document state
  *
- * Fixes applied:
+ * C4 fix: Session gate is now Firebase Auth's onAuthStateChanged — not a bare
+ *   localStorage uid. auth.currentUser must be non-null (i.e. the user has
+ *   completed signInAnonymously in authService) before we trust the session.
+ *   The localStorage SESSION_KEY is used only as a lookup hint to find the
+ *   Emergo users/{uid} Firestore document — it is never the auth gate itself.
+ *
+ * Other fixes retained:
  * - W7: calls signOut() when user doc is deleted while session is active
  * - W11: sets uid and userDoc in same batch before setting loading=false
  *        to prevent AuthGuard flash of login page on hard refresh
@@ -9,8 +15,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 import { getStoredSession, signOut } from '../services/authService';
-import { db } from '../services/firebase';
+import { db, auth } from '../services/firebase';
 import type { UserDocument } from '../types';
 
 interface UseAuthReturn {
@@ -30,30 +37,48 @@ export function useAuth(): UseAuthReturn {
 
   useEffect(() => {
     let unsub: (() => void) | undefined;
+    let firestoreUnsub: (() => void) | undefined;
 
-    const init = async () => {
-      setLoading(true);
-      const storedUid = getStoredSession();
+    // C4 fix: The primary auth gate is Firebase Auth's onAuthStateChanged.
+    // Only when Firebase confirms an active session (firebaseUser != null)
+    // do we trust the SESSION_KEY hint and subscribe to the Firestore user doc.
+    unsub = onAuthStateChanged(auth, (firebaseUser) => {
+      // Clean up any prior Firestore listener before potentially re-attaching
+      if (firestoreUnsub) {
+        firestoreUnsub();
+        firestoreUnsub = undefined;
+      }
 
-      if (!storedUid) {
-        // Batch all state updates together to avoid intermediate renders
+      if (!firebaseUser) {
+        // No Firebase Auth session — not authenticated
         setUid(null);
         setUserDoc(null);
         setLoading(false);
         return;
       }
 
-      const userRef = doc(db, 'users', storedUid);
-      unsub = onSnapshot(
+      // Firebase Auth session exists; look up the Emergo user document
+      const emergoUid = getStoredSession();
+      if (!emergoUid) {
+        // Firebase says authenticated but no Emergo uid hint — sign out to reset
+        signOut().catch(() => {});
+        setUid(null);
+        setUserDoc(null);
+        setLoading(false);
+        return;
+      }
+
+      const userRef = doc(db, 'users', emergoUid);
+      firestoreUnsub = onSnapshot(
         userRef,
         (snap) => {
           if (snap.exists()) {
             // Set uid and userDoc atomically — prevents AuthGuard seeing uid=value + userDoc=null
-            setUid(storedUid);
-            setUserDoc({ uid: storedUid, ...snap.data() } as UserDocument);
+            setUid(emergoUid);
+            setUserDoc({ uid: emergoUid, ...snap.data() } as UserDocument);
           } else {
             // Doc deleted while session active — force sign out to prevent limbo
-            signOut();
+            signOut().catch(() => {});
             setUid(null);
             setUserDoc(null);
           }
@@ -64,14 +89,14 @@ export function useAuth(): UseAuthReturn {
           setLoading(false);
         }
       );
-    };
-
-    init().catch((err) => {
-      console.error('[useAuth] init failed:', err);
-      setLoading(false);
     });
 
-    return () => { if (unsub) unsub(); };
+    return () => {
+      if (unsub) unsub();
+      if (firestoreUnsub) firestoreUnsub();
+    };
+  // tick forces a re-run when refresh() is called (e.g. after sign-out)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
 
   return { uid, userDoc, loading, refresh };
