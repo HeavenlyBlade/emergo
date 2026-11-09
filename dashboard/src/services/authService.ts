@@ -213,5 +213,5 @@ export async function createOfficialAccount(
     createdAt: serverTimestamp(),
   });
 
-  console.log(`✅ Account created — uid: ${uid}, username: ${username}, role: ${role}`);
+  console.log(`[createOfficialAccount] Account created — uid: ${uid}, username: ${username}, role: ${role}`);
 }

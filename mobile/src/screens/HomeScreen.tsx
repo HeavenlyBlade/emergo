@@ -40,7 +40,7 @@ export default function HomeScreen({ navigation }: Props) {
   // Shown to officials/tanods until dashboard is ready
   return (
     <View style={styles.container}>
-      <Text style={styles.logo}>🚨</Text>
+      <Text style={styles.logo}>E</Text>
       <Text style={styles.title}>Emergo</Text>
       <Text style={styles.welcome}>
         Welcome, {userDoc?.displayName ?? '...'}
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
     padding: 28,
     gap: 12,
   },
-  logo: { fontSize: 52 },
+  logo: { fontSize: 52, fontWeight: '900', color: '#D32F2F' },
   title: { fontSize: 28, fontWeight: '700', color: '#D32F2F' },
   welcome: { fontSize: 18, fontWeight: '600', color: '#111' },
   role: { fontSize: 14, color: '#555' },

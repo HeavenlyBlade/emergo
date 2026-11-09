@@ -14,7 +14,7 @@ import { X, MapPin, Clock, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { IncidentDocument, UserRole } from '../types';
 import { verifyIncident, resolveIncident } from '../services/incidentService';
-import { STATUS_BG, STATUS_LABELS, formatFullDate } from '../utils/incidentUtils';
+import { STATUS_BG, STATUS_LABELS, formatFullDate, formatResponseTime } from '../utils/incidentUtils';
 
 interface Props {
   incident: IncidentDocument;
@@ -104,7 +104,7 @@ export default function IncidentDetailPanel({
               rel="noreferrer"
               className="text-xs text-blue-600 hover:underline mt-1 block"
             >
-              Open in Google Maps ↁE            </a>
+              Open in Google Maps &rarr;</a>
           )}
         </div>
 
@@ -116,10 +116,22 @@ export default function IncidentDetailPanel({
           <div className="mt-1 space-y-1 text-xs text-gray-500">
             <p>Reported: {formatFullDate(incident.reportedAt)}</p>
             {incident.verifiedAt && (
-              <p>Verified: {formatFullDate(incident.verifiedAt)}</p>
+              <>
+                <p>Verified: {formatFullDate(incident.verifiedAt)}</p>
+                <p className="text-green-600 font-medium">
+                  Response time: {formatResponseTime(incident.reportedAt, incident.verifiedAt)}
+                </p>
+              </>
             )}
             {incident.resolvedAt && (
-              <p>Resolved: {formatFullDate(incident.resolvedAt)}</p>
+              <>
+                <p>Resolved: {formatFullDate(incident.resolvedAt)}</p>
+                {incident.verifiedAt && (
+                  <p className="text-gray-500 font-medium">
+                    Resolution time: {formatResponseTime(incident.reportedAt, incident.resolvedAt)}
+                  </p>
+                )}
+              </>
             )}
           </div>
         </div>

@@ -51,7 +51,6 @@ export default function DisplayNameSetupScreen({ onAuthSuccess }: Props) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Text style={styles.logo}>👋</Text>
       <Text style={styles.title}>What's your name?</Text>
       <Text style={styles.subtitle}>
         This helps barangay officials identify you when you send an alert.
@@ -93,8 +92,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     gap: 14,
   },
-  logo: { fontSize: 52 },
-  title: { fontSize: 26, fontWeight: '700', color: '#111' },
+  title: { fontSize: 26, fontWeight: '700', color: '#111', marginBottom: 4 },
   subtitle: { fontSize: 14, color: '#666', textAlign: 'center', lineHeight: 20 },
   input: {
     width: '100%',

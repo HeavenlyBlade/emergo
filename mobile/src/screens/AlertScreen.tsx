@@ -23,7 +23,7 @@ import {
 import { Timestamp } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 import { submitEmergencyAlert, subscribeToMyIncidents } from '../services/incidentService';
-import { STATUS_COLORS, STATUS_LABELS, formatRelativeTime } from '../utils/incidentUtils';
+import { STATUS_COLORS, STATUS_LABELS, formatRelativeTime, formatResponseTime } from '../utils/incidentUtils';
 import type { IncidentDocument } from '../types';
 
 export default function AlertScreen() {
@@ -90,7 +90,7 @@ export default function AlertScreen() {
           <ActivityIndicator size="large" color="#fff" />
         ) : (
           <>
-            <Text style={styles.alertIcon}>🚨</Text>
+        <Text style={styles.alertIcon}>!</Text>
             <Text style={styles.alertButtonText}>SEND EMERGENCY ALERT</Text>
             <Text style={styles.alertButtonSub}>Tap to send your location to officials</Text>
           </>
@@ -98,7 +98,7 @@ export default function AlertScreen() {
       </TouchableOpacity>
 
       <Text style={styles.warning}>
-        ⚠️ Only use for real emergencies. False alerts are a violation of barangay rules.
+        Only use for real emergencies. False alerts are a violation of barangay rules.
       </Text>
 
       {/* Recent alerts */}
@@ -124,6 +124,14 @@ export default function AlertScreen() {
               {incident.description ? (
                 <Text style={styles.description}>{incident.description}</Text>
               ) : null}
+              {incident.verifiedAt && (
+                <Text style={styles.responseTime}>
+                  Responded in {formatResponseTime(
+                    incident.reportedAt as any,
+                    incident.verifiedAt as any
+                  )}
+                </Text>
+              )}
             </View>
           ))}
         </View>
@@ -172,7 +180,9 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   alertIcon: {
-    fontSize: 48,
+    fontSize: 52,
+    fontWeight: '900',
+    color: '#fff',
   },
   alertButtonText: {
     color: '#fff',
@@ -232,5 +242,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6B7280',
     marginTop: 2,
+  },
+  responseTime: {
+    fontSize: 12,
+    color: '#10B981',
+    fontWeight: '600',
+    marginTop: 4,
   },
 });

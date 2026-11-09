@@ -27,7 +27,6 @@ import {
   Timestamp,
   type Unsubscribe,
 } from 'firebase/firestore';
-import NetInfo from '@react-native-community/netinfo';
 import { db } from './firebase';
 import { getCurrentLocation } from './locationService';
 import { notifyOfficialsAndTanods } from './notificationService';
@@ -39,11 +38,8 @@ export async function submitEmergencyAlert(
   uid: string,
   description?: string
 ): Promise<string> {
-  // Option B — block on no connection
-  const netState = await NetInfo.fetch();
-  if (!netState.isConnected) {
-    throw new Error('No connection. Move to an area with signal and try again.');
-  }
+  // If the device is offline, the Firestore addDoc call below will throw
+  // and the caller (AlertScreen) will display the error to the user.
 
   // H4 fix: rate limit — prevent submitting more than one alert every 5 minutes
   const fiveMinutesAgo = Timestamp.fromDate(

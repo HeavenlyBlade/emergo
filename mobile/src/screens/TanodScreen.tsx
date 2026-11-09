@@ -35,6 +35,7 @@ import {
   STATUS_LABELS,
   formatRelativeTime,
   formatFullDate,
+  formatResponseTime,
 } from '../utils/incidentUtils';
 import type { IncidentDocument, IncidentStatus } from '../types';
 
@@ -47,14 +48,16 @@ const FILTER_OPTIONS: { label: string; value: IncidentStatus | 'all' }[] = [
 
 export default function TanodScreen() {
   const { userDoc, refresh } = useAuth();
-  const { incidents, loading } = useIncidents();
   const [filter, setFilter] = useState<IncidentStatus | 'all'>('all');
   const [expanded, setExpanded] = useState<string | null>(null);
   // L8 fix: refreshKey forces re-mount of the incidents subscription on manual refresh.
   // Data is already real-time via onSnapshot, so this is a manual override for edge cases.
   const [refreshKey, setRefreshKey] = useState(0);
+  const { incidents, loading } = useIncidents(refreshKey);
 
   const filtered = filter === 'all'
+    ? incidents
+    : incidents.filter((i) => i.status === filter);
 
   const unverifiedCount = incidents.filter(
     (i) => i.status === 'unverified'
@@ -115,6 +118,9 @@ export default function TanodScreen() {
                 <Text style={styles.detailValue}>
                   {formatFullDate(item.verifiedAt as Timestamp)}
                 </Text>
+                <Text style={styles.responseTime}>
+                  Response: {formatResponseTime(item.reportedAt as Timestamp, item.verifiedAt as Timestamp)}
+                </Text>
               </>
             )}
 
@@ -128,13 +134,13 @@ export default function TanodScreen() {
                   )
                 }
               >
-                <Text style={styles.mapButtonText}>📍 Open in Google Maps</Text>
+                <Text style={styles.mapButtonText}>Open in Google Maps</Text>
               </TouchableOpacity>
             )}
 
             <View style={styles.roleNote}>
               <Text style={styles.roleNoteText}>
-                ℹ️ Verification and resolution are handled by barangay officials.
+                Verification and resolution are handled by barangay officials.
               </Text>
             </View>
           </View>
@@ -162,7 +168,7 @@ export default function TanodScreen() {
       {unverifiedCount > 0 && (
         <View style={styles.alertBadge}>
           <Text style={styles.alertBadgeText}>
-            🚨 {unverifiedCount} unverified incident
+            {unverifiedCount} unverified incident
             {unverifiedCount > 1 ? 's' : ''} need attention
           </Text>
         </View>
@@ -288,6 +294,7 @@ const styles = StyleSheet.create({
   expandedContent: { marginTop: 12, gap: 4 },
   detailLabel: { fontSize: 11, color: '#9CA3AF', fontWeight: '600', marginTop: 6 },
   detailValue: { fontSize: 13, color: '#374151' },
+  responseTime: { fontSize: 12, color: '#10B981', fontWeight: '600', marginTop: 2 },
   mapButton: {
     backgroundColor: '#EFF6FF',
     borderRadius: 8,

@@ -7,7 +7,11 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest'
 
 // ── Mock Firebase ────────────────────────────────────────────────────────────
-vi.mock('firebase/app', () => ({ initializeApp: vi.fn() }))
+vi.mock('firebase/app', () => ({
+  initializeApp: vi.fn(() => ({})),
+  getApps: vi.fn(() => []),
+  getApp: vi.fn(() => ({})),
+}))
 vi.mock('firebase/auth', () => ({
   getAuth: vi.fn(() => ({})),
   signInAnonymously: vi.fn(() => Promise.resolve({ user: { uid: 'anon-uid' } })),
@@ -30,13 +34,14 @@ import { hashPassword } from '../services/authService'
 
 // ── Web Crypto is available in Node 19+; polyfill for older environments ──────
 beforeAll(() => {
-  if (typeof globalThis.crypto === 'undefined') {
-    // Node < 19 — use the built-in crypto module
+  if (typeof globalThis.crypto === 'undefined' || typeof globalThis.crypto.subtle === 'undefined') {
+    // Node < 19 or vmThreads sandbox — use the built-in crypto module
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const nodeCrypto = require('crypto') as typeof import('crypto')
     Object.defineProperty(globalThis, 'crypto', {
       value: nodeCrypto.webcrypto,
-      writable: false,
+      configurable: true,
+      writable: true,
     })
   }
 })

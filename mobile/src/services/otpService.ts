@@ -56,7 +56,7 @@ export async function generateAndSendOtp(phoneNumber: string): Promise<void> {
 
   // Store in Firestore — keyed by phone number (normalized: +639...)
   // attempts starts at 0; incremented on each failed verification attempt.
-  const otpRef = doc(db, 'otp_codes', phoneNumber.replace(/\+/g, ''));
+  const otpRef = doc(db, 'otp_codes', phoneNumber.replace(/\+/g, '').replace(/\s/g, ''));
   await setDoc(otpRef, {
     code,
     phoneNumber,
@@ -76,7 +76,7 @@ export async function verifyOtp(
   phoneNumber: string,
   code: string
 ): Promise<boolean> {
-  const otpRef = doc(db, 'otp_codes', phoneNumber.replace(/\+/g, ''));
+  const otpRef = doc(db, 'otp_codes', phoneNumber.replace(/\+/g, '').replace(/\s/g, ''));
   const snap = await getDoc(otpRef);
 
   if (!snap.exists()) return false;

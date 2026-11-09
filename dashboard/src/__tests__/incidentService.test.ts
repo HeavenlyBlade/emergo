@@ -6,10 +6,18 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// ── Mock Firebase ────────────────────────────────────────────────────────────
-const mockGetDoc = vi.fn()
+// ── Hoisted mocks (must be declared before vi.mock factory runs) ─────────────
+const { mockGetDoc } = vi.hoisted(() => ({
+  mockGetDoc: vi.fn(),
+}))
 
-vi.mock('firebase/app', () => ({ initializeApp: vi.fn() }))
+// ── Mock Firebase ────────────────────────────────────────────────────────────
+
+vi.mock('firebase/app', () => ({
+  initializeApp: vi.fn(() => ({})),
+  getApps: vi.fn(() => []),
+  getApp: vi.fn(() => ({})),
+}))
 vi.mock('firebase/auth', () => ({
   getAuth: vi.fn(() => ({})),
   signInAnonymously: vi.fn(() => Promise.resolve()),

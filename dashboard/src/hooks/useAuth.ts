@@ -31,18 +31,23 @@ export function useAuth(): UseAuthReturn {
   const [uid, setUid] = useState<string | null>(null);
   const [userDoc, setUserDoc] = useState<UserDocument | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tick, setTick] = useState(0);
 
-  const refresh = useCallback(() => setTick((t) => t + 1), []);
+  // refresh() is only needed for sign-out to clear local state.
+  // On login, onAuthStateChanged fires automatically — no manual kick needed.
+  const refresh = useCallback(() => {
+    if (!auth.currentUser) {
+      setUid(null);
+      setUserDoc(null);
+    }
+  }, []);
 
   useEffect(() => {
-    let unsub: (() => void) | undefined;
     let firestoreUnsub: (() => void) | undefined;
 
     // C4 fix: The primary auth gate is Firebase Auth's onAuthStateChanged.
     // Only when Firebase confirms an active session (firebaseUser != null)
     // do we trust the SESSION_KEY hint and subscribe to the Firestore user doc.
-    unsub = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
       // Clean up any prior Firestore listener before potentially re-attaching
       if (firestoreUnsub) {
         firestoreUnsub();
@@ -92,12 +97,12 @@ export function useAuth(): UseAuthReturn {
     });
 
     return () => {
-      if (unsub) unsub();
+      unsub();
       if (firestoreUnsub) firestoreUnsub();
     };
-  // tick forces a re-run when refresh() is called (e.g. after sign-out)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick]);
+  // Empty deps — listener is set up once and stays alive for the app lifetime.
+  // onAuthStateChanged handles all session changes (login, sign-out, expiry).
+  }, []);
 
   return { uid, userDoc, loading, refresh };
 }

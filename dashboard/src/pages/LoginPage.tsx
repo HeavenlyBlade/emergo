@@ -106,7 +106,7 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
 
       <div className="relative z-10 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl shadow-2xl p-8 w-full max-w-sm">
         <div className="text-center mb-8">
-          <span className="text-5xl">🚨</span>
+          <span className="text-5xl font-black text-red-600">E</span>
           <h1 className="text-3xl font-bold text-white mt-2">Emergo</h1>
           <p className="text-white/70 text-sm mt-1">
             Barangay Marketview — Official Dashboard

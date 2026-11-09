@@ -62,7 +62,7 @@ export default function PhoneEntryScreen({ navigation }: Props) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Text style={styles.logo}>🚨</Text>
+      <Text style={styles.logo}>Emergo</Text>
       <Text style={styles.title}>Emergo</Text>
       <Text style={styles.subtitle}>Enter your mobile number to continue</Text>
 
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     gap: 12,
   },
-  logo: { fontSize: 52 },
+  logo: { fontSize: 24, fontWeight: '800', color: '#D32F2F' },
   title: { fontSize: 28, fontWeight: '700', color: '#D32F2F' },
   subtitle: { fontSize: 15, color: '#555', textAlign: 'center', marginBottom: 8 },
   inputRow: {

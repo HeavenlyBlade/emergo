@@ -103,3 +103,28 @@ This section supersedes any conflicting entries below. The entries below are pre
   cd C:\emergo\mobile
   npx eas-cli build --platform android --profile preview --non-interactive
   ```
+
+## October 2026 — Research-Driven Improvements
+
+### Fix: TanodScreen filter bug
+**Issue:** `const filtered = filter === 'all'` was incomplete — the expression was never finished, causing `filtered` to be a boolean and breaking the FlatList.
+**Fix:** Completed to `filter === 'all' ? incidents : incidents.filter((i) => i.status === filter)`.
+
+### Fix: `useIncidents` pull-to-refresh
+**Issue:** `refreshKey` in TanodScreen was incremented on pull-to-refresh but `useIncidents()` didn't accept it, so the listener was never re-subscribed.
+**Fix:** Added optional `refreshKey?: number` parameter to `useIncidents`. When incremented, the `useEffect` re-runs and re-subscribes the Firestore listener.
+
+### Improvement: Seconds-precision relative timestamps
+**Before:** Any alert under 60 seconds old showed "Just now".
+**After:** Shows exact seconds (e.g. "12s ago") for fresh alerts under 60 seconds. "Just now" still appears for alerts under 10 seconds.
+**Rationale:** Emergency response requires precise time awareness. "12s ago" is more useful than "Just now" when coordinating response to an active incident.
+**Files changed:** `mobile/src/utils/incidentUtils.ts`, `dashboard/src/utils/incidentUtils.ts`
+
+### Improvement: Response time display
+**Added:** `formatResponseTime(from, to)` utility that calculates elapsed time between two Firestore timestamps.
+**Where shown:**
+- Dashboard IncidentDetailPanel: "⚡ Response time: 4m 32s" under the verified timestamp
+- TanodScreen: "⚡ Response: 4m 32s" in the expanded incident card
+- AlertScreen: "⚡ Responded in 4m 32s" in the resident's incident history
+**Rationale:** Response time is a key metric in your ISO/IEC 25010 evaluation (Functionality / Time Behaviour sub-characteristic). Displaying it in-app means evaluators can see it directly, and your thesis Results chapter can reference real numbers from the pilot.
+**Files changed:** `dashboard/src/utils/incidentUtils.ts`, `dashboard/src/components/IncidentDetailPanel.tsx`, `mobile/src/utils/incidentUtils.ts`, `mobile/src/screens/TanodScreen.tsx`, `mobile/src/screens/AlertScreen.tsx`

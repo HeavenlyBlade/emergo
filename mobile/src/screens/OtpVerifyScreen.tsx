@@ -60,7 +60,7 @@ export default function OtpVerifyScreen({ navigation, route, onAuthSuccess }: Pr
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Text style={styles.logo}>🚨</Text>
+      <Text style={styles.logo}>Emergo</Text>
       <Text style={styles.title}>Enter code</Text>
       <Text style={styles.subtitle}>
         We sent a 6-digit code to{'\n'}
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     gap: 14,
   },
-  logo: { fontSize: 48 },
+  logo: { fontSize: 22, fontWeight: '800', color: '#D32F2F' },
   title: { fontSize: 26, fontWeight: '700', color: '#D32F2F' },
   subtitle: { fontSize: 15, color: '#555', textAlign: 'center', lineHeight: 22 },
   phone: { fontWeight: '700', color: '#111' },

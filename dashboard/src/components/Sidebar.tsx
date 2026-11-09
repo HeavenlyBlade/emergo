@@ -29,7 +29,7 @@ export default function Sidebar({ active, userDoc }: Props) {
       {/* Logo */}
       <div className="px-4 py-5 border-b border-gray-700">
         <div className="flex items-center gap-3">
-          <span className="text-2xl">🚨</span>
+          <span className="text-2xl font-bold text-red-500">E</span>
           <span className="hidden md:block text-white font-bold text-lg">Emergo</span>
         </div>
       </div>

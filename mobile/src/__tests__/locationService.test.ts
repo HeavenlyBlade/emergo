@@ -8,16 +8,17 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals'
 
 // ── Mock expo-location ───────────────────────────────────────────────────────
-const mockRequestForegroundPermissionsAsync = jest.fn()
-const mockGetCurrentPositionAsync = jest.fn()
-
 jest.mock('expo-location', () => ({
-  requestForegroundPermissionsAsync: mockRequestForegroundPermissionsAsync,
-  getCurrentPositionAsync: mockGetCurrentPositionAsync,
+  requestForegroundPermissionsAsync: jest.fn(),
+  getCurrentPositionAsync: jest.fn(),
   Accuracy: { High: 6 },
 }))
 
+import * as Location from 'expo-location'
 import { getCurrentLocation } from '../services/locationService'
+
+const mockRequestForegroundPermissionsAsync = Location.requestForegroundPermissionsAsync as jest.Mock
+const mockGetCurrentPositionAsync = Location.getCurrentPositionAsync as jest.Mock
 
 describe('getCurrentLocation', () => {
   beforeEach(() => {
@@ -48,8 +49,15 @@ describe('getCurrentLocation', () => {
 
     const locationPromise = getCurrentLocation()
 
-    // Advance clock past the 15-second timeout
+    // Let the permission check resolve first (it's a microtask-based promise)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // Now advance past the 15-second GPS timeout
     jest.advanceTimersByTime(15_001)
+
+    // Flush remaining microtasks so the Promise.race rejection propagates
+    await Promise.resolve()
 
     await expect(locationPromise).rejects.toThrow('GPS_TIMEOUT')
   })
