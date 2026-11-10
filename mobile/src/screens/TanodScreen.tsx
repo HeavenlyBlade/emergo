@@ -113,6 +113,18 @@ export default function TanodScreen() {
               {STATUS_LABELS[item.status]}
             </Text>
           </View>
+          {item.severity && (
+            <Text style={[
+              styles.severityLabel,
+              item.severity === 'light'
+                ? { color: '#92400E', backgroundColor: '#FEF3C7' }
+                : item.severity === 'moderate'
+                ? { color: '#9A3412', backgroundColor: '#FFEDD5' }
+                : { color: '#991B1B', backgroundColor: '#FEE2E2' },
+            ]}>
+              {item.severity.charAt(0).toUpperCase() + item.severity.slice(1)}
+            </Text>
+          )}
           <Text style={styles.timeText}>
             {formatRelativeTime(item.reportedAt as Timestamp)}
           </Text>
@@ -334,4 +346,12 @@ const styles = StyleSheet.create({
   },
   roleNoteText: { fontSize: 12, color: '#6B7280', lineHeight: 18 },
   empty: { textAlign: 'center', color: '#9CA3AF', marginTop: 60, fontSize: 14 },
+  severityLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
 });

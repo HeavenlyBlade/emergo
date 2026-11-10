@@ -72,6 +72,17 @@ export default function IncidentDetailPanel({
         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_BG[incident.status]}`}>
           {STATUS_LABELS[incident.status]}
         </span>
+        {incident.severity && (
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ml-1 ${
+            incident.severity === 'light'
+              ? 'bg-amber-100 text-amber-800'
+              : incident.severity === 'moderate'
+              ? 'bg-orange-100 text-orange-800'
+              : 'bg-red-100 text-red-800'
+          }`}>
+            {incident.severity.charAt(0).toUpperCase() + incident.severity.slice(1)}
+          </span>
+        )}
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
           <X size={18} />
         </button>

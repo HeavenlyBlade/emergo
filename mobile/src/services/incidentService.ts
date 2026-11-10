@@ -36,7 +36,8 @@ import type { IncidentDocument } from '../types';
 
 export async function submitEmergencyAlert(
   uid: string,
-  description?: string
+  description?: string,
+  severity?: 'light' | 'moderate' | 'extreme'
 ): Promise<string> {
   // If the device is offline, the Firestore addDoc call below will throw
   // and the caller (AlertScreen) will display the error to the user.
@@ -64,6 +65,7 @@ export async function submitEmergencyAlert(
     reportedBy: uid,
     location: new GeoPoint(coords.latitude, coords.longitude),
     description: description?.trim() ?? '',
+    severity: severity ?? 'moderate',
   });
 
   // Fetch reporter name for the notification

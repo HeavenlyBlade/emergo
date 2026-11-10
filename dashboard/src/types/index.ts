@@ -40,6 +40,7 @@ export interface IncidentDocument {
   reportedBy: string;
   location: GeoPointLike;
   description?: string;
+  severity?: 'light' | 'moderate' | 'extreme';
   verifiedBy?: string;
   verifiedAt?: TimestampLike;
   resolvedBy?: string;

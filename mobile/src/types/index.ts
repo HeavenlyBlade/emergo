@@ -41,6 +41,7 @@ export interface IncidentDocument {
   reportedBy: string;         // uid of the resident who submitted
   location: GeoPoint;
   description?: string;
+  severity?: 'light' | 'moderate' | 'extreme';
   verifiedBy?: string;        // uid of the official who verified — only role == 'official'
   verifiedAt?: Timestamp;
   resolvedBy?: string;        // uid of the official who resolved
