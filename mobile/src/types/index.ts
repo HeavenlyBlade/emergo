@@ -46,6 +46,7 @@ export interface IncidentDocument {
   verifiedAt?: Timestamp;
   resolvedBy?: string;        // uid of the official who resolved
   resolvedAt?: Timestamp;
+  photoBase64?: string;
 }
 
 // ─── Navigation param types ───────────────────────────────────────────────────

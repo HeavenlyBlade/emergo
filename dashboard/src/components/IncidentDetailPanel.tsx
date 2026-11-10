@@ -98,6 +98,18 @@ export default function IncidentDetailPanel({
           </p>
         </div>
 
+        {/* Photo */}
+        {incident.photoBase64 && (
+          <div>
+            <p className="text-sm font-semibold text-gray-700">Photo</p>
+            <img
+              src={`data:image/jpeg;base64,${incident.photoBase64}`}
+              alt="Incident photo"
+              className="mt-1 w-full rounded-lg object-cover max-h-48"
+            />
+          </div>
+        )}
+
         {/* Location */}
         <div>
           <p className="text-sm font-semibold text-gray-700 flex items-center gap-1">

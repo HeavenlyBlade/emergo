@@ -45,4 +45,5 @@ export interface IncidentDocument {
   verifiedAt?: TimestampLike;
   resolvedBy?: string;
   resolvedAt?: TimestampLike;
+  photoBase64?: string;
 }

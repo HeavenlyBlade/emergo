@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Linking,
   Platform,
   ScrollView,
@@ -22,6 +23,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Timestamp } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 import { useLocation } from '../hooks/useLocation';
@@ -44,6 +46,8 @@ export default function AlertScreen() {
   const [incidents, setIncidents] = useState<IncidentDocument[]>([]);
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<Severity>('moderate');
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
 
   useEffect(() => {
     if (!uid) return;
@@ -57,6 +61,68 @@ export default function AlertScreen() {
     Linking.openURL(url).catch(() =>
       Alert.alert('Error', 'Could not open Google Maps.')
     );
+  };
+
+  const handleAddPhoto = () => {
+    Alert.alert(
+      'Add Photo',
+      'Choose an option',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Take Photo', onPress: () => launchCamera() },
+        { text: 'Choose from Library', onPress: () => launchLibrary() },
+      ]
+    );
+  };
+
+  const processImageResult = (result: ImagePicker.ImagePickerResult) => {
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (!asset.base64) {
+      Alert.alert('Error', 'Could not read photo data. Please try again.');
+      return;
+    }
+    if (asset.base64.length > 900 * 1024) {
+      Alert.alert(
+        'Photo Too Large',
+        'Photo is too large. Please retake with better lighting or closer to the subject.'
+      );
+      return;
+    }
+    setPhotoBase64(asset.base64);
+    setPhotoUri(asset.uri);
+  };
+
+  const launchCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'Camera access is required to take photos.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: 'images',
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.4,
+      base64: true,
+    });
+    processImageResult(result);
+  };
+
+  const launchLibrary = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'Photo library access is required to choose photos.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images',
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.4,
+      base64: true,
+    });
+    processImageResult(result);
   };
 
   const handleSendAlert = async () => {
@@ -74,7 +140,8 @@ export default function AlertScreen() {
               await submitEmergencyAlert(
                 uid!,
                 description.trim() || undefined,
-                severity
+                severity,
+                photoBase64 ?? undefined
               );
               Alert.alert(
                 'Alert Sent ✅',
@@ -82,6 +149,8 @@ export default function AlertScreen() {
               );
               setDescription('');
               setSeverity('moderate');
+              setPhotoBase64(null);
+              setPhotoUri(null);
             } catch (error: any) {
               const message =
                 error?.message === 'GPS_TIMEOUT'
@@ -177,6 +246,32 @@ export default function AlertScreen() {
         />
         <Text style={styles.charCount}>{description.length}/200</Text>
       </View>
+
+      {/* Photo section */}
+      {photoUri ? (
+        <View style={styles.photoPreviewContainer}>
+          <Image
+            source={{ uri: photoUri }}
+            style={styles.photoPreview}
+            resizeMode="cover"
+          />
+          <TouchableOpacity
+            style={styles.removePhotoBtn}
+            onPress={() => { setPhotoBase64(null); setPhotoUri(null); }}
+          >
+            <Text style={styles.removePhotoBtnText}>✕ Remove</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.photoButton}
+          onPress={handleAddPhoto}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.photoButtonIcon}>📷</Text>
+          <Text style={styles.photoButtonText}>Add Photo (optional)</Text>
+        </TouchableOpacity>
+      )}
 
       {/* Warning box */}
       <View style={styles.warningBox}>
@@ -412,4 +507,39 @@ const styles = StyleSheet.create({
   timeText: { fontSize: 12, color: '#9CA3AF', marginLeft: 'auto' },
   description: { fontSize: 13, color: '#6B7280', marginTop: 2 },
   responseTime: { fontSize: 12, color: '#10B981', fontWeight: '600', marginTop: 4 },
+  photoButton: {
+    height: 100,
+    width: '100%',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    borderStyle: 'dashed',
+    backgroundColor: '#F9FAFB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  photoButtonIcon: { fontSize: 28 },
+  photoButtonText: { fontSize: 14, color: '#6B7280', fontWeight: '500' },
+  photoPreviewContainer: {
+    width: '100%',
+    borderRadius: 10,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  photoPreview: {
+    width: '100%',
+    height: 160,
+    borderRadius: 10,
+  },
+  removePhotoBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  removePhotoBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
 });

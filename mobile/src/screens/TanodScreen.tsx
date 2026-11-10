@@ -19,6 +19,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
+  Image,
   Linking,
   Platform,
   RefreshControl,
@@ -170,6 +171,14 @@ export default function TanodScreen() {
               >
                 <Text style={styles.mapButtonText}>Open in Google Maps</Text>
               </TouchableOpacity>
+            )}
+
+            {item.photoBase64 && (
+              <Image
+                source={{ uri: `data:image/jpeg;base64,${item.photoBase64}` }}
+                style={styles.incidentPhoto}
+                resizeMode="cover"
+              />
             )}
 
             <View style={styles.roleNote}>
@@ -375,4 +384,5 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
   },
+  incidentPhoto: { width: '100%', height: 140, borderRadius: 10, marginTop: 8 },
 });
