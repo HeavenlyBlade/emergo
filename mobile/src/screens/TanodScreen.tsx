@@ -15,7 +15,7 @@
  * reflects the correct permissions without hiding it confusingly.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -27,9 +27,11 @@ import {
   View,
 } from 'react-native';
 import { Timestamp } from 'firebase/firestore';
+import * as Location from 'expo-location';
 import { useAuth } from '../hooks/useAuth';
 import { useIncidents } from '../hooks/useIncidents';
 import { signOut } from '../services/authService';
+import { startLocationBroadcast } from '../services/tanodLocationService';
 import {
   STATUS_COLORS,
   STATUS_LABELS,
@@ -47,13 +49,32 @@ const FILTER_OPTIONS: { label: string; value: IncidentStatus | 'all' }[] = [
 ];
 
 export default function TanodScreen() {
-  const { userDoc, refresh } = useAuth();
+  const { uid, userDoc, refresh } = useAuth();
   const [filter, setFilter] = useState<IncidentStatus | 'all'>('all');
   const [expanded, setExpanded] = useState<string | null>(null);
   // L8 fix: refreshKey forces re-mount of the incidents subscription on manual refresh.
   // Data is already real-time via onSnapshot, so this is a manual override for edge cases.
   const [refreshKey, setRefreshKey] = useState(0);
   const { incidents, loading } = useIncidents(refreshKey);
+
+  const locationSubRef = useRef<Location.LocationSubscription | null>(null);
+
+  useEffect(() => {
+    if (userDoc?.role !== 'tanod') return;
+    if (!uid) return;
+
+    startLocationBroadcast(uid, userDoc.displayName ?? '')
+      .then((sub) => {
+        locationSubRef.current = sub;
+      })
+      .catch((err) => {
+        console.error('[TanodScreen] Location broadcast failed:', err);
+      });
+
+    return () => {
+      locationSubRef.current?.remove();
+    };
+  }, [uid, userDoc?.role]);
 
   const filtered = filter === 'all'
     ? incidents

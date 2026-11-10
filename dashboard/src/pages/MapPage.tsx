@@ -15,12 +15,22 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '../services/firebase';
 import { useIncidents } from '../hooks/useIncidents';
 import { useAuth } from '../hooks/useAuth';
 import type { IncidentDocument } from '../types';
 import { STATUS_COLORS, STATUS_LABELS, formatRelativeTime } from '../utils/incidentUtils';
 import IncidentDetailPanel from '../components/IncidentDetailPanel';
 import Sidebar from '../components/Sidebar';
+
+interface TanodLocation {
+  uid: string;
+  latitude: number;
+  longitude: number;
+  lastSeen: { toDate: () => Date };
+  displayName: string;
+}
 
 // Center on Barangay Marketview, Lucena City
 const DEFAULT_CENTER: [number, number] = [13.9374, 121.6175];
@@ -39,6 +49,25 @@ export default function MapPage() {
   const { incidents } = useIncidents();
   const { uid, userDoc } = useAuth();
   const [selected, setSelected] = useState<IncidentDocument | null>(null);
+  const [tanodLocations, setTanodLocations] = useState<TanodLocation[]>([]);
+
+  useEffect(() => {
+    if (userDoc?.role !== 'official' && userDoc?.role !== 'tanod') return;
+
+    const unsub = onSnapshot(collection(db, 'tanod_locations'), (snapshot) => {
+      const now = new Date().getTime();
+      const locations = snapshot.docs
+        .map((d) => ({ uid: d.id, ...d.data() } as TanodLocation))
+        .filter(
+          (loc) =>
+            loc.lastSeen &&
+            now - loc.lastSeen.toDate().getTime() < 5 * 60 * 1000
+        );
+      setTanodLocations(locations);
+    });
+
+    return () => unsub();
+  }, [userDoc?.role]);
 
   const selectedCoords: [number, number] | null = selected?.location
     ? [selected.location.latitude, selected.location.longitude]
@@ -71,6 +100,12 @@ export default function MapPage() {
                   {label}
                 </span>
               )
+            )}
+            {(userDoc?.role === 'official' || userDoc?.role === 'tanod') && (
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: '#1D4ED8' }} />
+                Tanod
+              </span>
             )}
           </div>
         </div>
@@ -128,6 +163,27 @@ export default function MapPage() {
                   </CircleMarker>
                 );
               })}
+
+              {tanodLocations.map((tanod) => (
+                <CircleMarker
+                  key={`tanod-${tanod.uid}`}
+                  center={[tanod.latitude, tanod.longitude]}
+                  radius={8}
+                  pathOptions={{
+                    color: '#1D4ED8',
+                    fillColor: '#1D4ED8',
+                    fillOpacity: 0.9,
+                    weight: 2,
+                  }}
+                >
+                  <Popup>
+                    <div className="text-sm">
+                      <p className="font-semibold text-blue-700">🔵 Tanod</p>
+                      <p>{tanod.displayName}</p>
+                    </div>
+                  </Popup>
+                </CircleMarker>
+              ))}
             </MapContainer>
           </div>
 
