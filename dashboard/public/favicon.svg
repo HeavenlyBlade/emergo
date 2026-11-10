@@ -1,30 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="100" fill="#C62828"/>
-  <radialGradient id="glow" cx="50%" cy="48%" r="52%">
-    <stop offset="0%" stop-color="#EF5350" stop-opacity="1"/>
-    <stop offset="100%" stop-color="#B71C1C" stop-opacity="1"/>
-  </radialGradient>
-  <rect width="512" height="512" rx="100" fill="url(#glow)"/>
-  <path d="M256 68 L388 128 L388 272 C388 352 320 416 256 444 C192 416 124 352 124 272 L124 128 Z"
-        fill="#B71C1C" stroke="white" stroke-width="10" stroke-linejoin="round"/>
-  <path d="M256 96 L368 148 L368 272 C368 340 308 396 256 420 C204 396 144 340 144 272 L144 148 Z"
-        fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4" stroke-linejoin="round"/>
-  <text x="256" y="318"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Red rounded square background -->
+  <rect width="32" height="32" rx="6" fill="#C62828"/>
+  <!-- Shield outline -->
+  <path d="M16 3 L26 7.5 L26 17 C26 22 21 26.5 16 28.5 C11 26.5 6 22 6 17 L6 7.5 Z"
+        fill="#B71C1C" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+  <!-- Bold E letter -->
+  <text x="16" y="21"
         font-family="Arial Black, Arial, sans-serif"
-        font-size="190"
+        font-size="14"
         font-weight="900"
         text-anchor="middle"
-        fill="white"
-        letter-spacing="-4">E</text>
-  <path d="M200 138 A80 80 0 0 1 312 138"
-        fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="12" stroke-linecap="round"/>
-  <path d="M220 115 A65 65 0 0 1 292 115"
-        fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="8" stroke-linecap="round"/>
-  <text x="256" y="482"
-        font-family="Arial, sans-serif"
-        font-size="44"
-        font-weight="700"
-        text-anchor="middle"
-        fill="rgba(255,255,255,0.85)"
-        letter-spacing="10">EMERGO</text>
+        fill="white">E</text>
 </svg>

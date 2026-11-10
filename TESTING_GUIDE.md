@@ -101,13 +101,38 @@ You should receive the SMS within a few seconds. `state: Pending` means the devi
 
 ## Test Accounts
 
-Create accounts at `http://localhost:5173/dev-login` before testing.
+Before testing, you need accounts for each role. These are created via the dev-login page.
 
-| Role | Login method | Can do |
-|------|-------------|--------|
-| `resident` | Phone OTP (mobile app) | Send emergency alerts |
-| `tanod` | Phone OTP (mobile app) | View and monitor incidents |
-| `official` | Username + password (dashboard) | Verify and resolve incidents |
+### The /dev-login route
+
+`http://localhost:5173/dev-login` is a hidden developer-only page built into the dashboard. It is **not linked from anywhere in the app** — you must type the URL directly. It exists only to make testing easier and should be removed before any public deployment.
+
+It provides two tools:
+
+**1. Create account**
+Creates official, tanod, or resident accounts directly in Firestore without going through the normal registration flow. Use this to set up your test accounts before each session.
+
+**2. Seed test incidents**
+Adds 5 pre-built incidents around Barangay Marketview to Firestore (in different statuses: unverified, verified, resolved). Useful when you want the map and incident list populated immediately without having to send real alerts first.
+
+> The seed button adds incidents every time it is clicked. If you see duplicate incidents on the map, open Firebase Console → Firestore → incidents collection and delete the extras manually.
+
+### Creating test accounts
+
+1. Open `http://localhost:5173/dev-login`
+2. Click **Create account**
+3. Select a role and fill in the fields:
+
+| Role | Fields required | Login method |
+|------|----------------|-------------|
+| Official | Username, password, full name, phone (optional) | Dashboard username + password |
+| Tanod | Username, password, full name, phone (optional) | Dashboard username + password |
+| Resident | Full name, phone number | Phone OTP on the mobile app |
+
+4. Click **Create account** — the account is immediately usable
+5. Repeat for each role you need
+
+> Resident accounts created here use the phone number as their UID. They can log in via OTP on the mobile app using that same number — no separate step needed.
 
 ---
 

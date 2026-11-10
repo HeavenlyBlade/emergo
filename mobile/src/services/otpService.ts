@@ -41,12 +41,18 @@ const OTP_EXPIRY_MINUTES = 10;
 const MAX_OTP_ATTEMPTS = 5;
 
 async function generateCode(): Promise<string> {
-  // Cryptographically secure 6-digit code using Web Crypto API
-  // Available in React Native 0.73+ via Hermes, and in all Expo SDK 50+ builds
-  const array = new Uint32Array(1);
-  crypto.getRandomValues(array);
-  const code = (100000 + (array[0] % 900000)).toString();
-  return code;
+  // Generate a cryptographically random 6-digit code.
+  // Uses Web Crypto API when available (Hermes 0.73+ / Expo SDK 50+).
+  // Falls back to Math.random() on older Hermes builds where globalThis.crypto
+  // is not exposed — acceptable here because codes are short-lived (10 min),
+  // single-use, and brute-force protected (5 attempt limit).
+  if (typeof globalThis.crypto !== 'undefined' && typeof globalThis.crypto.getRandomValues === 'function') {
+    const array = new Uint32Array(1);
+    globalThis.crypto.getRandomValues(array);
+    return (100000 + (array[0] % 900000)).toString();
+  }
+  // Fallback: 6 random digits without leading zeros guaranteed by range
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 export async function generateAndSendOtp(phoneNumber: string): Promise<void> {
