@@ -30,7 +30,7 @@ type Props = {
 };
 
 export default function OtpVerifyScreen({ navigation, route, onAuthSuccess }: Props) {
-  const { phoneNumber } = route.params;
+  const { phoneNumber, mode } = route.params;
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -43,7 +43,7 @@ export default function OtpVerifyScreen({ navigation, route, onAuthSuccess }: Pr
     setLoading(true);
     try {
       const userDoc = await confirmOtp(phoneNumber, otp);
-      if (!userDoc.displayName) {
+      if (mode === 'register' && !userDoc.displayName) {
         navigation.navigate('DisplayNameSetup');
       } else {
         onAuthSuccess();

@@ -93,6 +93,18 @@ export async function signOut(): Promise<void> {
   await AsyncStorage.removeItem(SESSION_KEY);
 }
 
+/**
+ * Checks if a Firestore user document exists for the given phone number.
+ * Used by the Sign In tab to prevent creating new accounts.
+ * uid is derived the same way confirmOtp derives it: strip '+' and spaces.
+ */
+export async function checkUserExists(phoneNumber: string): Promise<boolean> {
+  const uid = phoneNumber.replace(/\+/g, '').replace(/\s/g, '');
+  const userRef = doc(db, 'users', uid);
+  const snap = await getDoc(userRef);
+  return snap.exists() && !!(snap.data() as { displayName?: string }).displayName;
+}
+
 // ─── Push token registration ───────────────────────────────────────────────
 
 /**

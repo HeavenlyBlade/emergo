@@ -1,9 +1,8 @@
 /**
  * PhoneEntryScreen
  *
- * Step 1 of 2 in the auth flow.
- * User enters their Philippine mobile number (+63...).
- * On submit, generates and sends an OTP via SMS API PH.
+ * Step 1 of the auth flow.
+ * Two tabs: Register (new user) and Sign In (existing user).
  */
 
 import { useState } from 'react';
@@ -19,18 +18,21 @@ import {
   View,
 } from 'react-native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { sendOtp } from '../services/authService';
+import { sendOtp, checkUserExists } from '../services/authService';
 import { AuthStackParamList } from '../types';
+
+type Mode = 'register' | 'signin';
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'PhoneEntry'>;
 };
 
 export default function PhoneEntryScreen({ navigation }: Props) {
+  const [mode, setMode] = useState<Mode>('register');
   const [digits, setDigits] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSendOtp = async () => {
+  const handleSubmit = async () => {
     const cleaned = digits.replace(/\D/g, '');
 
     if (cleaned.length !== 10 || !cleaned.startsWith('9')) {
@@ -45,8 +47,20 @@ export default function PhoneEntryScreen({ navigation }: Props) {
     setLoading(true);
 
     try {
+      if (mode === 'signin') {
+        const exists = await checkUserExists(fullNumber);
+        if (!exists) {
+          Alert.alert(
+            'No account found',
+            'No account found for this number. Please register first.'
+          );
+          setLoading(false);
+          return;
+        }
+      }
+
       await sendOtp(fullNumber);
-      navigation.navigate('OtpVerify', { phoneNumber: fullNumber });
+      navigation.navigate('OtpVerify', { phoneNumber: fullNumber, mode });
     } catch (error: any) {
       Alert.alert(
         'Could not send code',
@@ -63,9 +77,31 @@ export default function PhoneEntryScreen({ navigation }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <Text style={styles.logo}>Emergo</Text>
-      <Text style={styles.title}>Emergo</Text>
-      <Text style={styles.subtitle}>Enter your mobile number to continue</Text>
+      <Text style={styles.helperText}>
+        Use your mobile number to send emergency alerts to barangay officials
+      </Text>
 
+      {/* Tab switcher */}
+      <View style={styles.tabRow}>
+        <TouchableOpacity
+          style={[styles.tab, mode === 'signin' && styles.tabActive]}
+          onPress={() => setMode('signin')}
+        >
+          <Text style={[styles.tabText, mode === 'signin' && styles.tabTextActive]}>
+            Sign In
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, mode === 'register' && styles.tabActive]}
+          onPress={() => setMode('register')}
+        >
+          <Text style={[styles.tabText, mode === 'register' && styles.tabTextActive]}>
+            Register
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Phone input */}
       <View style={styles.inputRow}>
         <Text style={styles.prefix}>+63</Text>
         <TextInput
@@ -78,19 +114,21 @@ export default function PhoneEntryScreen({ navigation }: Props) {
           onChangeText={(t) => setDigits(t.replace(/\D/g, ''))}
           autoFocus
           returnKeyType="done"
-          onSubmitEditing={handleSendOtp}
+          onSubmitEditing={handleSubmit}
         />
       </View>
 
       <TouchableOpacity
         style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handleSendOtp}
+        onPress={handleSubmit}
         disabled={loading}
       >
         {loading ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.buttonText}>Send verification code</Text>
+          <Text style={styles.buttonText}>
+            {mode === 'signin' ? 'Send code to sign in' : 'Send verification code'}
+          </Text>
         )}
       </TouchableOpacity>
 
@@ -106,20 +144,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 28,
+    paddingTop: Platform.OS === 'android' ? 56 : 44,
     gap: 12,
   },
   logo: { fontSize: 24, fontWeight: '800', color: '#D32F2F' },
-  title: { fontSize: 28, fontWeight: '700', color: '#D32F2F' },
-  subtitle: { fontSize: 15, color: '#555', textAlign: 'center', marginBottom: 8 },
+  helperText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  tabRow: {
+    flexDirection: 'row',
+    width: '100%',
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    padding: 4,
+    marginBottom: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  tabActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
+  tabText: { fontSize: 15, fontWeight: '600', color: '#6B7280' },
+  tabTextActive: { color: '#D32F2F' },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
     borderColor: '#ddd',
-    borderRadius: 10,
+    borderRadius: 12,
     width: '100%',
     paddingHorizontal: 14,
-    height: 52,
+    height: 56,
   },
   prefix: { fontSize: 16, color: '#333', marginRight: 6, fontWeight: '600' },
   input: { flex: 1, fontSize: 18, color: '#111', letterSpacing: 1 },
@@ -127,7 +188,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#D32F2F',
     width: '100%',
     height: 52,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,

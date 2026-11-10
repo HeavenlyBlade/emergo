@@ -55,7 +55,7 @@ export interface IncidentDocument {
  */
 export type AuthStackParamList = {
   PhoneEntry: undefined;
-  OtpVerify: { phoneNumber: string };
+  OtpVerify: { phoneNumber: string; mode: 'register' | 'signin' };
   DisplayNameSetup: undefined;
 };
 
