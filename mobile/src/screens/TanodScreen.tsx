@@ -20,6 +20,7 @@ import {
   Alert,
   FlatList,
   Linking,
+  Platform,
   RefreshControl,
   StyleSheet,
   Text,
@@ -187,7 +188,14 @@ export default function TanodScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Incident Monitor</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.headerTitle}>Incident Monitor</Text>
+            {unverifiedCount > 0 && (
+              <View style={styles.headerBadge}>
+                <Text style={styles.headerBadgeText}>{unverifiedCount}</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.headerSub}>
             Hi, {userDoc?.displayName ?? '...'} · Tanod
           </Text>
@@ -247,7 +255,9 @@ export default function TanodScreen() {
         }
         ListEmptyComponent={
           <Text style={styles.empty}>
-            {loading ? 'Loading incidents...' : 'No incidents found.'}
+            {loading
+              ? 'Loading incidents...'
+              : 'No incidents reported. The area is clear.'}
           </Text>
         }
       />
@@ -259,7 +269,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   header: {
     backgroundColor: '#1F2937',
-    paddingTop: 52,
+    paddingTop: Platform.OS === 'android' ? 56 : 52,
     paddingBottom: 16,
     paddingHorizontal: 20,
     flexDirection: 'row',
@@ -269,6 +279,17 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 20, fontWeight: '700', color: '#fff' },
   headerSub: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
   signOut: { color: '#EF4444', fontSize: 13, fontWeight: '600' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerBadge: {
+    backgroundColor: '#EF4444',
+    borderRadius: 12,
+    minWidth: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  headerBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   alertBadge: {
     backgroundColor: '#FEF3C7',
     borderBottomWidth: 1,
@@ -330,7 +351,7 @@ const styles = StyleSheet.create({
   responseTime: { fontSize: 12, color: '#10B981', fontWeight: '600', marginTop: 2 },
   mapButton: {
     backgroundColor: '#EFF6FF',
-    borderRadius: 8,
+    borderRadius: 12,
     paddingVertical: 10,
     alignItems: 'center',
     marginTop: 10,
