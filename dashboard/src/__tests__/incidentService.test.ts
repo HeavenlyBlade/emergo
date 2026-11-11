@@ -59,14 +59,6 @@ describe('assertOfficial (via verifyIncident)', () => {
     )
   })
 
-  it('throws when the caller has role "tanod"', async () => {
-    mockGetDoc.mockResolvedValueOnce(makeSnap(true, { role: 'tanod' }))
-
-    await expect(verifyIncident('incident-1', 'uid-tanod')).rejects.toThrow(
-      'Unauthorized'
-    )
-  })
-
   it('does not throw the Unauthorized error when caller is "official"', async () => {
     // assertOfficial passes; the function then calls runTransaction.
     // runTransaction is mocked to immediately throw "Incident not found" —

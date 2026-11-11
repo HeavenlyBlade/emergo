@@ -5,7 +5,7 @@ rules_version = '2';
 // Deploy with: firebase deploy --only firestore:rules
 // (run from the dashboard/ directory where firebase.json lives)
 //
-// Role hierarchy: admin > official > tanod > resident
+// Role hierarchy: admin > official > resident
 // These rules are the authoritative enforcement of RBAC. UI-layer checks are
 // defense-in-depth only. Any write that doesn't pass these rules is rejected
 // by Firestore regardless of what the client does.
@@ -15,11 +15,11 @@ service cloud.firestore {
 
     // ─── Helper functions ───────────────────────────────────────────────────
 
-    // Returns true if the calling user's role is 'official' or 'tanod'.
+    // Returns true if the calling user's role is 'official'.
     // Reads the user's document from Firestore to check the role field.
     function isOfficial(uid) {
       return get(/databases/$(database)/documents/users/$(uid)).data.role
-        in ['official', 'tanod'];
+        == 'official';
     }
 
     // Returns true if the calling user's role is 'admin'.

@@ -193,7 +193,7 @@ export async function getUserDocument(uid: string): Promise<UserDocument | null>
 export async function createOfficialAccount(
   username: string,
   password: string,
-  role: 'official' | 'tanod',
+  role: 'official',
   displayName: string,
   phoneNumber: string
 ): Promise<void> {

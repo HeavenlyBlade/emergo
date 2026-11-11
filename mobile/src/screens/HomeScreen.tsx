@@ -2,10 +2,7 @@
  * HomeScreen — role-based router
  *
  * Residents → AlertScreen
- * Officials/Tanods → placeholder (Dashboard coming in Module 7)
- *
- * This screen itself is just a thin router — it redirects immediately
- * based on the user's role. The actual UI is in the role-specific screens.
+ * Officials → OfficialScreen (mobile incident monitor)
  */
 
 import { useEffect } from 'react';
@@ -26,10 +23,9 @@ export default function HomeScreen({ navigation }: Props) {
     if (!userDoc) return;
     if (userDoc.role === 'resident') {
       navigation.replace('Alert');
-    } else if (userDoc.role === 'tanod') {
-      navigation.replace('Tanod');
+    } else if (userDoc.role === 'official') {
+      navigation.replace('Official');
     }
-    // Officials stay here until dashboard is built — they use the web dashboard
   }, [userDoc, navigation]);
 
   const handleSignOut = async () => {
@@ -37,21 +33,12 @@ export default function HomeScreen({ navigation }: Props) {
     refresh();
   };
 
-  // Shown to officials/tanods until dashboard is ready
   return (
     <View style={styles.container}>
       <Text style={styles.logo}>E</Text>
       <Text style={styles.title}>Emergo</Text>
       <Text style={styles.welcome}>
         Welcome, {userDoc?.displayName ?? '...'}
-      </Text>
-      <Text style={styles.role}>
-        Role: <Text style={styles.roleBadge}>{userDoc?.role}</Text>
-      </Text>
-      <Text style={styles.note}>
-        {userDoc?.role === 'official'
-          ? 'Use the Emergo web dashboard on a PC or laptop to manage incidents.'
-          : 'Loading...'}
       </Text>
       <TouchableOpacity style={styles.signOut} onPress={handleSignOut}>
         <Text style={styles.signOutText}>Sign out</Text>
@@ -72,9 +59,6 @@ const styles = StyleSheet.create({
   logo: { fontSize: 52, fontWeight: '900', color: '#D32F2F' },
   title: { fontSize: 28, fontWeight: '700', color: '#D32F2F' },
   welcome: { fontSize: 18, fontWeight: '600', color: '#111' },
-  role: { fontSize: 14, color: '#555' },
-  roleBadge: { fontWeight: '700', color: '#D32F2F' },
-  note: { fontSize: 13, color: '#888', textAlign: 'center', marginTop: 12 },
   signOut: { marginTop: 24 },
   signOutText: { color: '#D32F2F', fontSize: 14, fontWeight: '600' },
 });

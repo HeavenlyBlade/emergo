@@ -46,7 +46,8 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -54,9 +55,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "36038bea-4f5b-4067-b3e8-22b4caaa7422"
+        "projectId": "c0eb9169-69d4-4485-b8ea-f9a0a75965c9"
       }
     },
-    "owner": "keiji_nash"
+    "owner": "hayven"
   }
 }

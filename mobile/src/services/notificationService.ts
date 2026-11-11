@@ -86,7 +86,7 @@ export async function notifyOfficialsAndTanods(
   // Query all officials and tanods who have a push token
   const officialsQuery = query(
     collection(db, 'users'),
-    where('role', 'in', ['official', 'tanod'])
+    where('role', 'in', ['official'])
   );
 
   const snap = await getDocs(officialsQuery);

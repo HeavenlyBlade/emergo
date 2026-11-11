@@ -88,7 +88,7 @@ export default function PhoneEntryScreen({ navigation }: Props) {
           onPress={() => setMode('signin')}
         >
           <Text style={[styles.tabText, mode === 'signin' && styles.tabTextActive]}>
-            Sign In
+            Login
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -127,7 +127,7 @@ export default function PhoneEntryScreen({ navigation }: Props) {
           <ActivityIndicator color="#fff" />
         ) : (
           <Text style={styles.buttonText}>
-            {mode === 'signin' ? 'Send code to sign in' : 'Send verification code'}
+            {mode === 'signin' ? 'Send code to log in' : 'Send verification code'}
           </Text>
         )}
       </TouchableOpacity>

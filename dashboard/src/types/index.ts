@@ -7,7 +7,7 @@
  * At runtime these are still Firestore GeoPoint/Timestamp instances.
  */
 
-export type UserRole = 'resident' | 'official' | 'tanod';
+export type UserRole = 'resident' | 'official';
 
 export interface UserDocument {
   uid: string;

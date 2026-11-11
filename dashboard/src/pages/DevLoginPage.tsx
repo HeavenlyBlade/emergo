@@ -188,7 +188,7 @@ function CreateAccountForm() {
       await createOfficialAccount(
         form.username,
         form.password,
-        role as 'official' | 'tanod',
+        role as 'official',
         form.displayName,
         form.phoneNumber || '+630000000000'
       );
@@ -218,7 +218,6 @@ function CreateAccountForm() {
             className="w-full bg-gray-700 text-white text-sm rounded-lg px-3 h-9 outline-none"
           >
             <option value="official">Official</option>
-            <option value="tanod">Tanod</option>
             <option value="resident">Resident</option>
           </select>
 

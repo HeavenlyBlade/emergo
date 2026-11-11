@@ -192,7 +192,7 @@ export default function MapPage() {
             <IncidentDetailPanel
               incident={selected}
               uid={uid!}
-              userRole={userDoc?.role ?? 'tanod'}
+              userRole={userDoc?.role ?? 'resident'}
               onClose={() => setSelected(null)}
               isPanel
             />

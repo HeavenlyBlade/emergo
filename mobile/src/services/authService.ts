@@ -115,7 +115,7 @@ export async function registerPushTokenIfNeeded(
   uid: string,
   role: string
 ): Promise<void> {
-  if (role === 'official' || role === 'tanod') {
+  if (role === 'official') {
     const { registerPushToken } = await import('./notificationService');
     await registerPushToken(uid);
   }

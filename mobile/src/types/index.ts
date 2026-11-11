@@ -7,7 +7,7 @@ import { Timestamp, GeoPoint } from 'firebase/firestore';
 
 // ─── User roles ───────────────────────────────────────────────────────────────
 
-export type UserRole = 'resident' | 'official' | 'tanod';
+export type UserRole = 'resident' | 'official';
 
 // ─── Firestore document shapes ────────────────────────────────────────────────
 
@@ -67,5 +67,5 @@ export type AuthStackParamList = {
 export type AppStackParamList = {
   Home: undefined;
   Alert: undefined;
-  Tanod: undefined;
+  Official: undefined;
 };
