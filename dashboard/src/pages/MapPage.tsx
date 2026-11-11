@@ -52,7 +52,7 @@ export default function MapPage() {
   const [tanodLocations, setTanodLocations] = useState<TanodLocation[]>([]);
 
   useEffect(() => {
-    if (userDoc?.role !== 'official' && userDoc?.role !== 'tanod') return;
+    if (userDoc?.role !== 'official') return;
 
     const unsub = onSnapshot(collection(db, 'tanod_locations'), (snapshot) => {
       const now = new Date().getTime();
@@ -101,10 +101,10 @@ export default function MapPage() {
                 </span>
               )
             )}
-            {(userDoc?.role === 'official' || userDoc?.role === 'tanod') && (
+            {userDoc?.role === 'official' && (
               <span className="flex items-center gap-1">
                 <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: '#1D4ED8' }} />
-                Tanod
+                Official (live)
               </span>
             )}
           </div>
@@ -178,7 +178,7 @@ export default function MapPage() {
                 >
                   <Popup>
                     <div className="text-sm">
-                      <p className="font-semibold text-blue-700">🔵 Tanod</p>
+                      <p className="font-semibold text-blue-700">Official (live)</p>
                       <p>{tanod.displayName}</p>
                     </div>
                   </Popup>
