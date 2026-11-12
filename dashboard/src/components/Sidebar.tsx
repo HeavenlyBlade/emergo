@@ -4,6 +4,7 @@
 
 import { Link } from 'react-router-dom';
 import { Map, List, BarChart2, LogOut } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { signOut } from '../services/authService';
 import type { UserDocument } from '../types';
 
@@ -20,8 +21,25 @@ const NAV = [
 
 export default function Sidebar({ active, userDoc }: Props) {
   const handleSignOut = () => {
-    signOut();
-    window.location.replace('/');
+    toast.custom((t) => (
+      <div className="bg-white rounded-xl shadow-lg p-4 text-sm">
+        <p className="text-sm font-semibold text-gray-800 mb-3">Sign out?</p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { toast.dismiss(t.id); signOut(); window.location.replace('/'); }}
+            className="bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg"
+          >
+            Sign out
+          </button>
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-medium px-3 py-1.5 rounded-lg"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    ), { duration: Infinity });
   };
 
   return (
