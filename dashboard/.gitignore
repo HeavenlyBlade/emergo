@@ -2,3 +2,7 @@ node_modules
 dist
 .env
 .env.local
+
+# Service account key — never commit
+/service-account.json
+../service-account.json

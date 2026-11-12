@@ -107,47 +107,44 @@ export async function signInWithCredentials(
     throw new Error('Username and password are required.');
   }
 
+  // Establish an anonymous Firebase Auth session FIRST so Firestore
+  // rules (require request.auth != null) allow the query below.
+  await signInAnonymously(auth);
+
   // Find user by username field
   const usersRef = collection(db, 'users');
   const q = query(usersRef, where('username', '==', username.trim().toLowerCase()));
   const snap = await getDocs(q);
 
   if (snap.empty) {
+    await firebaseSignOut(auth);
     throw new Error('Invalid username or password.');
   }
 
   const userSnap = snap.docs[0];
   const userData = userSnap.data();
 
-  // Only officials and tanods can log into the dashboard
+  // Only officials can log into the dashboard
   if (userData.role === 'resident') {
-    throw new Error('This dashboard is for officials and tanods only.');
+    await firebaseSignOut(auth);
+    throw new Error('This dashboard is for officials only.');
   }
 
-  // Derive hash using the stored salt and compare.
-  // Accounts created before the PBKDF2 migration won't have a passwordSalt.
-  // If salt is absent, the login fails — the account must be recreated.
   const storedSalt: string | undefined = userData.passwordSalt;
   if (!storedSalt) {
+    await firebaseSignOut(auth);
     throw new Error(
-      'Account requires a password reset. Please ask an admin to recreate this account with the updated hashing scheme.'
+      'Account requires a password reset. Please ask an admin to recreate this account.'
     );
   }
 
   const inputHash = await deriveKey(password, storedSalt);
   if (inputHash !== userData.passwordHash) {
+    await firebaseSignOut(auth);
     throw new Error('Invalid username or password.');
   }
 
-  // C4 fix: establish a Firebase Auth session (anonymous) instead of trusting
-  // a raw uid in localStorage. Firebase manages the signed session token.
-  // The Emergo user's uid (in the users collection) is separate from the
-  // Firebase Auth uid — we store the Emergo uid in the Firebase Auth user's
-  // custom data via a Firestore lookup on each auth state change in useAuth.
-  await signInAnonymously(auth);
-  // Store the Emergo uid in localStorage ONLY as a lookup hint for useAuth to
-  // know which users/{uid} doc to read after Firebase Auth confirms the session.
-  // The actual authentication gate is auth.currentUser — not this value alone.
+  // Password verified — keep the anonymous session alive and store the Emergo uid
   const emergoUid = userSnap.id;
   localStorage.setItem(SESSION_KEY, emergoUid);
 
