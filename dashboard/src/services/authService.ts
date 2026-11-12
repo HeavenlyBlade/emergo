@@ -107,11 +107,8 @@ export async function signInWithCredentials(
     throw new Error('Username and password are required.');
   }
 
-  // Establish an anonymous Firebase Auth session FIRST so Firestore
-  // rules (require request.auth != null) allow the query below.
   await signInAnonymously(auth);
 
-  // Find user by username field
   const usersRef = collection(db, 'users');
   const q = query(usersRef, where('username', '==', username.trim().toLowerCase()));
   const snap = await getDocs(q);
@@ -124,7 +121,6 @@ export async function signInWithCredentials(
   const userSnap = snap.docs[0];
   const userData = userSnap.data();
 
-  // Only officials can log into the dashboard
   if (userData.role === 'resident') {
     await firebaseSignOut(auth);
     throw new Error('This dashboard is for officials only.');
@@ -133,9 +129,7 @@ export async function signInWithCredentials(
   const storedSalt: string | undefined = userData.passwordSalt;
   if (!storedSalt) {
     await firebaseSignOut(auth);
-    throw new Error(
-      'Account requires a password reset. Please ask an admin to recreate this account.'
-    );
+    throw new Error('Account requires a password reset. Please ask an admin to recreate this account.');
   }
 
   const inputHash = await deriveKey(password, storedSalt);
@@ -144,7 +138,6 @@ export async function signInWithCredentials(
     throw new Error('Invalid username or password.');
   }
 
-  // Password verified — keep the anonymous session alive and store the Emergo uid
   const emergoUid = userSnap.id;
   localStorage.setItem(SESSION_KEY, emergoUid);
 
