@@ -1,7 +1,7 @@
 /**
- * MapPage  EModule 6: Dashboard Live Map
+ * MapPage  EModule 6: Dashboard Live Map
  *
- * Uses Leaflet + OpenStreetMap  Ecompletely free, no API key needed.
+ * Uses Leaflet + OpenStreetMap  Ecompletely free, no API key needed.
  *
  * Real-time Firestore listener on incidents collection.
  * Status-differentiated pins:
@@ -10,19 +10,26 @@
  *   - resolved: gray
  *
  * Clicking a pin opens the incident detail panel.
+ *
+ * Emergency alarm: when a genuinely NEW unverified incident arrives after
+ * page mount, a looping Web Audio API siren plays and a modal appears.
+ * Multiple alerts are queued; each must be Responded to or Dismissed
+ * before the next is shown. Auto-dismisses after 5 minutes.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useIncidents } from '../hooks/useIncidents';
 import { useAuth } from '../hooks/useAuth';
+import { useAlarmSound } from '../hooks/useAlarmSound';
 import type { IncidentDocument } from '../types';
-import { STATUS_COLORS, STATUS_LABELS, formatRelativeTime } from '../utils/incidentUtils';
+import { STATUS_COLORS, STATUS_LABELS, STATUS_BG, formatRelativeTime } from '../utils/incidentUtils';
 import IncidentDetailPanel from '../components/IncidentDetailPanel';
 import Sidebar from '../components/Sidebar';
+import { AlertTriangle } from 'lucide-react';
 
 interface TanodLocation {
   uid: string;
@@ -35,6 +42,8 @@ interface TanodLocation {
 // Center on Barangay Marketview, Lucena City
 const DEFAULT_CENTER: [number, number] = [13.9374, 121.6175];
 const DEFAULT_ZOOM = 15;
+
+const AUTO_DISMISS_MS = 5 * 60 * 1000; // 5 minutes
 
 // Auto-fly to newly selected incident
 function MapFlyTo({ coords }: { coords: [number, number] | null }) {
@@ -51,6 +60,16 @@ export default function MapPage() {
   const [selected, setSelected] = useState<IncidentDocument | null>(null);
   const [tanodLocations, setTanodLocations] = useState<TanodLocation[]>([]);
 
+  // ── Alarm & modal state ──────────────────────────────────────────────
+  const { startAlarm, stopAlarm } = useAlarmSound();
+  const [alertQueue, setAlertQueue] = useState<IncidentDocument[]>([]);
+
+  // Track all incident IDs we have already seen so we don't re-trigger
+  const seenIdsRef = useRef<Set<string>>(new Set());
+  // Whether the initial population pass has been done
+  const initializedRef = useRef(false);
+
+  // ── Tanod location listener ──────────────────────────────────────────
   useEffect(() => {
     if (userDoc?.role !== 'official') return;
 
@@ -68,6 +87,69 @@ export default function MapPage() {
 
     return () => unsub();
   }, [userDoc?.role]);
+
+  // ── New-incident detector ────────────────────────────────────────────
+  useEffect(() => {
+    if (incidents.length === 0 && !initializedRef.current) return;
+
+    if (!initializedRef.current) {
+      // First non-empty snapshot: seed the seen set, don't alarm
+      incidents.forEach((inc) => seenIdsRef.current.add(inc.id));
+      initializedRef.current = true;
+      return;
+    }
+
+    // Subsequent updates: find truly new unverified incidents
+    const newAlerts: IncidentDocument[] = [];
+    incidents.forEach((inc) => {
+      if (inc.status === 'unverified' && !seenIdsRef.current.has(inc.id)) {
+        newAlerts.push(inc);
+      }
+      seenIdsRef.current.add(inc.id);
+    });
+
+    if (newAlerts.length > 0) {
+      setAlertQueue((prev) => [...prev, ...newAlerts]);
+    }
+  }, [incidents]);
+
+  // ── Start / stop alarm when queue head changes ───────────────────────
+  const currentAlert = alertQueue[0] ?? null;
+
+  useEffect(() => {
+    if (currentAlert) {
+      startAlarm();
+    } else {
+      stopAlarm();
+    }
+  }, [currentAlert?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Auto-dismiss after 5 minutes ────────────────────────────────────
+  const dismissFirst = useCallback(() => {
+    stopAlarm();
+    setAlertQueue((prev) => prev.slice(1));
+  }, [stopAlarm]);
+
+  useEffect(() => {
+    if (!currentAlert) return;
+    const timer = setTimeout(dismissFirst, AUTO_DISMISS_MS);
+    return () => clearTimeout(timer);
+  }, [currentAlert?.id, dismissFirst]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Modal action handlers ────────────────────────────────────────────
+  const handleRespond = useCallback(
+    (incident: IncidentDocument) => {
+      stopAlarm();
+      setAlertQueue((prev) => prev.slice(1));
+      setSelected(incident);
+    },
+    [stopAlarm]
+  );
+
+  const handleDismiss = useCallback(() => {
+    stopAlarm();
+    setAlertQueue((prev) => prev.slice(1));
+  }, [stopAlarm]);
 
   const selectedCoords: [number, number] | null = selected?.location
     ? [selected.location.latitude, selected.location.longitude]
@@ -199,6 +281,60 @@ export default function MapPage() {
           )}
         </div>
       </div>
+
+      {/* ── Emergency Alert Modal ─────────────────────────────────────── */}
+      {currentAlert && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
+            {/* Title row */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <h2 className="text-lg font-bold text-gray-900">New Emergency Alert</h2>
+            </div>
+
+            {/* Severity badge */}
+            <span
+              className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full mb-3 ${STATUS_BG[currentAlert.status]}`}
+            >
+              {STATUS_LABELS[currentAlert.status]}
+              {currentAlert.severity ? ` · ${currentAlert.severity.charAt(0).toUpperCase() + currentAlert.severity.slice(1)}` : ''}
+            </span>
+
+            {/* Description */}
+            <p className="text-gray-700 text-sm mb-2">
+              {currentAlert.description || 'No description'}
+            </p>
+
+            {/* Relative time */}
+            <p className="text-gray-400 text-xs mb-6">
+              {formatRelativeTime(currentAlert.reportedAt)}
+            </p>
+
+            {/* Queue indicator */}
+            {alertQueue.length > 1 && (
+              <p className="text-amber-600 text-xs font-medium mb-4">
+                +{alertQueue.length - 1} more alert{alertQueue.length - 1 > 1 ? 's' : ''} waiting
+              </p>
+            )}
+
+            {/* Actions */}
+            <button
+              onClick={() => handleRespond(currentAlert)}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+            >
+              Respond
+            </button>
+            <button
+              onClick={handleDismiss}
+              className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-lg mt-2 transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
