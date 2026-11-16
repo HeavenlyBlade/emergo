@@ -22,6 +22,7 @@ interface Props {
   userRole: UserRole;
   onClose: () => void;
   isPanel?: boolean; // true = right side panel, false = map overlay
+  usersMap?: Record<string, string>;
 }
 
 export default function IncidentDetailPanel({
@@ -30,8 +31,10 @@ export default function IncidentDetailPanel({
   userRole,
   onClose,
   isPanel = false,
+  usersMap,
 }: Props) {
   const [loading, setLoading] = useState<'verify' | 'resolve' | null>(null);
+  const reporterName = (usersMap && usersMap[incident.reportedBy]) ? usersMap[incident.reportedBy] : incident.reportedBy;
 
   const canAct = userRole === 'official';
 
@@ -157,6 +160,12 @@ export default function IncidentDetailPanel({
               </>
             )}
           </div>
+        </div>
+
+        {/* Reported By */}
+        <div>
+          <p className="text-sm font-semibold text-gray-700">Reported By</p>
+          <p className="text-xs text-gray-500 mt-1 font-mono">{reporterName}</p>
         </div>
       </div>
 

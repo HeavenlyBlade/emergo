@@ -58,6 +58,89 @@ export default function AdminPage() {
     setTimeout(() => URL.revokeObjectURL(url), 200);
   };
 
+  const handleReport = () => {
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Period
+    let period = 'No incidents';
+    if (incidents.length > 0) {
+      const sorted = [...incidents]
+        .filter((i) => i.reportedAt)
+        .sort((a, b) => a.reportedAt.toDate().getTime() - b.reportedAt.toDate().getTime());
+      if (sorted.length > 0) {
+        period = `${sorted[0].reportedAt.toDate().toLocaleString()} \u2013 ${sorted[sorted.length - 1].reportedAt.toDate().toLocaleString()}`;
+      }
+    }
+
+    // Avg response time
+    const withBoth = incidents.filter((i) => i.reportedAt && i.verifiedAt);
+    let avgResponseLine = 'N/A';
+    if (withBoth.length > 0) {
+      const totalMs = withBoth.reduce((sum, i) => {
+        return sum + (i.verifiedAt!.toDate().getTime() - i.reportedAt.toDate().getTime());
+      }, 0);
+      const avgMs = totalMs / withBoth.length;
+      const mins = Math.floor(avgMs / 60000);
+      const secs = Math.floor((avgMs % 60000) / 1000);
+      avgResponseLine = `${mins} min ${secs} sec`;
+    }
+
+    // Severity counts
+    const light    = incidents.filter((i) => i.severity === 'light').length;
+    const moderate = incidents.filter((i) => i.severity === 'moderate').length;
+    const extreme  = incidents.filter((i) => i.severity === 'extreme').length;
+
+    // Incident log
+    const incidentLog = incidents
+      .map((i) => {
+        const lat = i.location ? i.location.latitude.toFixed(6) : null;
+        const lng = i.location ? i.location.longitude.toFixed(6) : null;
+        const location = lat && lng ? `${lat}, ${lng}` : 'Unknown';
+        return [
+          `  ID          : ${i.id}`,
+          `  Status      : ${i.status}`,
+          `  Severity    : ${i.severity ?? '\u2014'}`,
+          `  Reported At : ${formatFullDate(i.reportedAt)}`,
+          `  Description : ${i.description || 'None'}`,
+          `  Location    : ${location}`,
+          `  Verified At : ${i.verifiedAt ? formatFullDate(i.verifiedAt) : '\u2014'}`,
+          `  Resolved At : ${i.resolvedAt ? formatFullDate(i.resolvedAt) : '\u2014'}`,
+          `  \u2500\u2500\u2500`,
+        ].join('\n');
+      })
+      .join('\n');
+
+    const lines = [
+      'EMERGO BARANGAY MARKETVIEW',
+      'INCIDENT SUMMARY REPORT',
+      `Generated: ${new Date().toLocaleString()}`,
+      `Period: ${period}`,
+      '\u2500'.repeat(41),
+      'OVERVIEW',
+      `  Total Incidents   : ${stats.total}`,
+      `  Unverified        : ${stats.unverified}`,
+      `  Verified          : ${stats.verified}`,
+      `  Resolved          : ${stats.resolved}`,
+      `  Avg Response Time : ${avgResponseLine}`,
+      '',
+      'SEVERITY BREAKDOWN',
+      `  Light    : ${light}`,
+      `  Moderate : ${moderate}`,
+      `  Extreme  : ${extreme}`,
+      '',
+      'INCIDENT LOG',
+      incidentLog,
+    ].join('\n');
+
+    const blob = new Blob([lines], { type: 'text/plain' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `emergo-report-${today}.txt`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 200);
+  };
+
   const toggleRow = (id: string) => setExpanded(expanded === id ? null : id);
 
   return (
@@ -71,12 +154,20 @@ export default function AdminPage() {
             <h1 className="text-xl font-bold text-gray-900">Records</h1>
             <p className="text-sm text-gray-500">Incident history for Barangay Marketview</p>
           </div>
-          <button
-            onClick={handleExport}
-            className="bg-red-700 hover:bg-red-800 text-white text-sm font-semibold px-4 py-2 rounded-lg"
-          >
-            Export CSV
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleReport}
+              className="bg-gray-700 hover:bg-gray-800 text-white text-sm font-semibold px-4 py-2 rounded-lg"
+            >
+              Report
+            </button>
+            <button
+              onClick={handleExport}
+              className="bg-red-700 hover:bg-red-800 text-white text-sm font-semibold px-4 py-2 rounded-lg"
+            >
+              Export CSV
+            </button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -270,9 +361,9 @@ function IncidentRow({
                   </div>
                 </div>
 
-                {/* Reporter UID (truncated) */}
+                {/* Reported By */}
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Reporter ID</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Reported By</p>
                   <p className="text-xs text-gray-500 mt-1 font-mono">{incident.reportedBy}</p>
                 </div>
               </div>

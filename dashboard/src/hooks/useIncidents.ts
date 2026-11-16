@@ -2,7 +2,7 @@
  * useIncidents — real-time incident list for the dashboard
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   collection,
   onSnapshot,
@@ -15,6 +15,8 @@ import type { IncidentDocument } from '../types';
 export function useIncidents() {
   const [incidents, setIncidents] = useState<IncidentDocument[]>([]);
   const [loading, setLoading] = useState(true);
+  const [newIncidents, setNewIncidents] = useState<IncidentDocument[]>([]);
+  const mountedRef = useRef(false);
 
   useEffect(() => {
     const q = query(
@@ -29,8 +31,31 @@ export function useIncidents() {
           id: d.id,
           ...d.data(),
         })) as IncidentDocument[];
+
+        if (!mountedRef.current) {
+          // First snapshot: seed state, do not emit new incidents
+          mountedRef.current = true;
+          setIncidents(data);
+          setLoading(false);
+          return;
+        }
+
+        // Subsequent snapshots: collect truly added unverified docs
+        const added: IncidentDocument[] = [];
+        snap.docChanges().forEach((change) => {
+          if (
+            change.type === 'added' &&
+            change.doc.data().status === 'unverified'
+          ) {
+            added.push({ id: change.doc.id, ...change.doc.data() } as IncidentDocument);
+          }
+        });
+
         setIncidents(data);
         setLoading(false);
+        if (added.length > 0) {
+          setNewIncidents(added);
+        }
       },
       (err) => {
         console.error('[useIncidents] onSnapshot error:', err);
@@ -41,5 +66,5 @@ export function useIncidents() {
     return () => unsub();
   }, []);
 
-  return { incidents, loading };
+  return { incidents, loading, newIncidents };
 }

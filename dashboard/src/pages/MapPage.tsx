@@ -12,17 +12,18 @@
  * Clicking a pin opens the incident detail panel.
  *
  * Emergency alarm: when a genuinely NEW unverified incident arrives after
- * page mount, a looping Web Audio API siren plays and a modal appears.
+ * page mount, a looping alarm plays and a modal appears.
  * Multiple alerts are queued; each must be Responded to or Dismissed
  * before the next is shown. Auto-dismisses after 5 minutes.
  */
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useIncidents } from '../hooks/useIncidents';
+import { useUsers } from '../hooks/useUsers';
 import { useAuth } from '../hooks/useAuth';
 import { useAlarmSound } from '../hooks/useAlarmSound';
 import type { IncidentDocument } from '../types';
@@ -55,7 +56,8 @@ function MapFlyTo({ coords }: { coords: [number, number] | null }) {
 }
 
 export default function MapPage() {
-  const { incidents } = useIncidents();
+  const { incidents, newIncidents } = useIncidents();
+  const { usersMap } = useUsers();
   const { uid, userDoc } = useAuth();
   const [selected, setSelected] = useState<IncidentDocument | null>(null);
   const [tanodLocations, setTanodLocations] = useState<TanodLocation[]>([]);
@@ -63,11 +65,6 @@ export default function MapPage() {
   // ── Alarm & modal state ──────────────────────────────────────────────
   const { startAlarm, stopAlarm } = useAlarmSound();
   const [alertQueue, setAlertQueue] = useState<IncidentDocument[]>([]);
-
-  // Track all incident IDs we have already seen so we don't re-trigger
-  const seenIdsRef = useRef<Set<string>>(new Set());
-  // Whether the initial population pass has been done
-  const initializedRef = useRef(false);
 
   // ── Tanod location listener ──────────────────────────────────────────
   useEffect(() => {
@@ -90,28 +87,10 @@ export default function MapPage() {
 
   // ── New-incident detector ────────────────────────────────────────────
   useEffect(() => {
-    if (incidents.length === 0 && !initializedRef.current) return;
-
-    if (!initializedRef.current) {
-      // First non-empty snapshot: seed the seen set, don't alarm
-      incidents.forEach((inc) => seenIdsRef.current.add(inc.id));
-      initializedRef.current = true;
-      return;
+    if (newIncidents.length > 0) {
+      setAlertQueue((prev) => [...prev, ...newIncidents]);
     }
-
-    // Subsequent updates: find truly new unverified incidents
-    const newAlerts: IncidentDocument[] = [];
-    incidents.forEach((inc) => {
-      if (inc.status === 'unverified' && !seenIdsRef.current.has(inc.id)) {
-        newAlerts.push(inc);
-      }
-      seenIdsRef.current.add(inc.id);
-    });
-
-    if (newAlerts.length > 0) {
-      setAlertQueue((prev) => [...prev, ...newAlerts]);
-    }
-  }, [incidents]);
+  }, [newIncidents]);
 
   // ── Start / stop alarm when queue head changes ───────────────────────
   const currentAlert = alertQueue[0] ?? null;
@@ -237,6 +216,9 @@ export default function MapPage() {
                         <p className="text-gray-500 text-xs">
                           {formatRelativeTime(incident.reportedAt)}
                         </p>
+                        <p className="text-gray-500 text-xs">
+                          Reported by: {usersMap[incident.reportedBy] ?? incident.reportedBy}
+                        </p>
                         {incident.description && (
                           <p className="mt-1">{incident.description}</p>
                         )}
@@ -277,6 +259,7 @@ export default function MapPage() {
               userRole={userDoc?.role ?? 'resident'}
               onClose={() => setSelected(null)}
               isPanel
+              usersMap={usersMap}
             />
           )}
         </div>

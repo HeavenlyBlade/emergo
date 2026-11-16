@@ -1,69 +1,26 @@
-/**
- * useAlarmSound
- *
- * Web Audio API siren — two-tone oscillator sweeping between 800 Hz and 1200 Hz
- * every 0.5 s, looping until stopped. No audio file needed.
- *
- * Usage:
- *   const { startAlarm, stopAlarm } = useAlarmSound();
- */
+// Place your alarm sound at dashboard/public/alarm.mp3
 import { useRef, useCallback } from 'react';
 
 export function useAlarmSound() {
-  const ctxRef = useRef<AudioContext | null>(null);
-  const oscRef = useRef<OscillatorNode | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const stopAlarm = useCallback(() => {
-    if (intervalRef.current !== null) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    if (oscRef.current) {
-      try {
-        oscRef.current.stop();
-        oscRef.current.disconnect();
-      } catch {
-        // already stopped — ignore
-      }
-      oscRef.current = null;
-    }
-    if (ctxRef.current) {
-      ctxRef.current.close().catch(() => undefined);
-      ctxRef.current = null;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
     }
   }, []);
 
   const startAlarm = useCallback(() => {
-    // Stop any currently running alarm first
     stopAlarm();
-
-    const ctx = new AudioContext();
-    ctxRef.current = ctx;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(800, ctx.currentTime);
-    gain.gain.setValueAtTime(0.4, ctx.currentTime);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    oscRef.current = osc;
-
-    // Alternate between 800 Hz and 1200 Hz every 0.5 s
-    let high = true;
-    intervalRef.current = setInterval(() => {
-      if (oscRef.current && ctxRef.current) {
-        high = !high;
-        oscRef.current.frequency.setValueAtTime(
-          high ? 1200 : 800,
-          ctxRef.current.currentTime
-        );
-      }
-    }, 500);
+    const audio = new Audio('/alarm.mp3');
+    audio.loop = true;
+    audio.onerror = () => {
+      audioRef.current = null;
+    };
+    audioRef.current = audio;
+    audio.play().catch(() => {});
   }, [stopAlarm]);
 
   return { startAlarm, stopAlarm };
