@@ -15,13 +15,18 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+  collection,
   doc,
   getDoc,
+  getDocs,
+  limit,
+  query,
   setDoc,
   updateDoc,
+  where,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, ensureAnonymousAuth } from './firebase';
 import { generateAndSendOtp, verifyOtp } from './otpService';
 import { UserDocument, UserRole } from '../types';
 
@@ -30,6 +35,7 @@ const SESSION_KEY = 'emergo_user_uid';
 // ─── OTP ─────────────────────────────────────────────────────────────────────
 
 export async function sendOtp(phoneNumber: string): Promise<void> {
+  await ensureAnonymousAuth();
   await generateAndSendOtp(phoneNumber);
 }
 
@@ -37,17 +43,37 @@ export async function confirmOtp(
   phoneNumber: string,
   code: string
 ): Promise<UserDocument> {
+  // Retry auth here — by the time OTP is verified, the network is confirmed
+  // working (the OTP SMS was received), so this retry is likely to succeed
+  // even if the initial ensureAnonymousAuth call in sendOtp failed.
+  await ensureAnonymousAuth();
   const isValid = await verifyOtp(phoneNumber, code);
   if (!isValid) {
     throw new Error('Invalid or expired verification code. Please try again.');
   }
 
   // Use phone number as uid (normalized: strip +)
-  const uid = phoneNumber.replace(/\+/g, '').replace(/\s/g, '');
+  const phoneUid = phoneNumber.replace(/\+/g, '').replace(/\s/g, '');
 
-  // Create users/{uid} on first login with role: 'resident' by default
-  const userRef = doc(db, 'users', uid);
-  const userSnap = await getDoc(userRef);
+  // Check by phoneUid first, then fallback to querying by phoneNumber
+  // (dashboard-created responder/official accounts use user_<username> as doc ID)
+  let uid = phoneUid;
+  let userRef = doc(db, 'users', uid);
+  let userSnap = await getDoc(userRef);
+
+  if (!userSnap.exists()) {
+    const q = query(
+      collection(db, 'users'),
+      where('phoneNumber', '==', phoneNumber),
+      limit(1)
+    );
+    const qSnap = await getDocs(q);
+    if (!qSnap.empty) {
+      uid = qSnap.docs[0].id;
+      userRef = doc(db, 'users', uid);
+      userSnap = qSnap.docs[0];
+    }
+  }
 
   if (!userSnap.exists()) {
     const newUser: Omit<UserDocument, 'uid'> = {
@@ -72,11 +98,13 @@ export async function saveDisplayName(
   uid: string,
   displayName: string
 ): Promise<void> {
+  await ensureAnonymousAuth();
   const userRef = doc(db, 'users', uid);
   await updateDoc(userRef, { displayName: displayName.trim() });
 }
 
 export async function getUserDocument(uid: string): Promise<UserDocument | null> {
+  await ensureAnonymousAuth();
   const userRef = doc(db, 'users', uid);
   const snap = await getDoc(userRef);
   if (!snap.exists()) return null;
@@ -99,23 +127,33 @@ export async function signOut(): Promise<void> {
  * uid is derived the same way confirmOtp derives it: strip '+' and spaces.
  */
 export async function checkUserExists(phoneNumber: string): Promise<boolean> {
+  await ensureAnonymousAuth();
   const uid = phoneNumber.replace(/\+/g, '').replace(/\s/g, '');
   const userRef = doc(db, 'users', uid);
   const snap = await getDoc(userRef);
-  return snap.exists() && !!(snap.data() as { displayName?: string }).displayName;
+  if (snap.exists()) return true;
+
+  // Fallback: check dashboard-created responder/official accounts by phoneNumber
+  const q = query(
+    collection(db, 'users'),
+    where('phoneNumber', '==', phoneNumber),
+    limit(1)
+  );
+  const qSnap = await getDocs(q);
+  return !qSnap.empty;
 }
 
 // ─── Push token registration ───────────────────────────────────────────────
 
 /**
  * Called after user doc loads in useAuth.
- * Registers push token for officials and tanods only.
+ * Registers push token for officials, tanods, and responders only.
  */
 export async function registerPushTokenIfNeeded(
   uid: string,
   role: string
 ): Promise<void> {
-  if (role === 'official') {
+  if (role === 'official' || role === 'tanod' || role === 'responder') {
     const { registerPushToken } = await import('./notificationService');
     await registerPushToken(uid);
   }

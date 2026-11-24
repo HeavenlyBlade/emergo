@@ -67,7 +67,11 @@ export default function OtpVerifyScreen({ navigation, route, onAuthSuccess }: Pr
       startCountdown();
       Alert.alert('Code sent', `A new code was sent to ${phoneNumber}`);
     } catch (error: any) {
-      Alert.alert('Could not resend', error?.message ?? 'Please try again.');
+      const isNetwork = error?.code === 'auth/network-request-failed' || error?.message?.includes('network');
+      Alert.alert(
+        isNetwork ? 'No Internet Connection' : 'Could not resend',
+        isNetwork ? 'Please check your internet connection and try again.' : (error?.message ?? 'Please try again.')
+      );
     } finally {
       setResending(false);
     }
@@ -82,13 +86,17 @@ export default function OtpVerifyScreen({ navigation, route, onAuthSuccess }: Pr
     setLoading(true);
     try {
       const userDoc = await confirmOtp(phoneNumber, otp);
-      if (mode === 'register' && !userDoc.displayName) {
+      if (!userDoc.displayName) {
         navigation.navigate('DisplayNameSetup');
       } else {
         onAuthSuccess();
       }
     } catch (error: any) {
-      Alert.alert('Verification failed', error?.message ?? 'Please try again.');
+      const isNetwork = error?.code === 'auth/network-request-failed' || error?.message?.includes('network');
+      Alert.alert(
+        isNetwork ? 'No Internet Connection' : 'Verification failed',
+        isNetwork ? 'Please check your internet connection and try again.' : (error?.message ?? 'Please try again.')
+      );
     } finally {
       setLoading(false);
     }

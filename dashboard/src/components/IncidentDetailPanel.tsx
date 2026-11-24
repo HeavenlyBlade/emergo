@@ -10,11 +10,11 @@
  */
 
 import { useState } from 'react';
-import { X, MapPin, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { X, MapPin, Clock, CheckCircle, XCircle, Send, MessageSquare, Radio } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { IncidentDocument, UserRole } from '../types';
-import { verifyIncident, resolveIncident } from '../services/incidentService';
-import { STATUS_BG, STATUS_LABELS, formatFullDate, formatResponseTime } from '../utils/incidentUtils';
+import { verifyIncident, resolveIncident, sendAdminMessage, DEFAULT_ADMIN_MESSAGE } from '../services/incidentService';
+import { STATUS_BG, STATUS_LABELS, formatFullDate, formatResponseTime, formatRelativeTime } from '../utils/incidentUtils';
 
 interface Props {
   incident: IncidentDocument;
@@ -33,19 +33,33 @@ export default function IncidentDetailPanel({
   isPanel = false,
   usersMap,
 }: Props) {
-  const [loading, setLoading] = useState<'verify' | 'resolve' | null>(null);
+  const [loading, setLoading] = useState<'verify' | 'resolve' | 'message' | null>(null);
   const reporterName = (usersMap && usersMap[incident.reportedBy]) ? usersMap[incident.reportedBy] : incident.reportedBy;
 
-  const canAct = userRole === 'official';
+  const canAct = userRole === 'official' || userRole === 'admin';
 
   const handleVerify = async () => {
     if (!canAct) { toast.error('Only officials can verify incidents.'); return; }
     setLoading('verify');
     try {
-      await verifyIncident(incident.id, uid);
-      toast.success('Incident verified.');
+      // Auto-send the verification reassurance message upon verification
+      await verifyIncident(incident.id, uid, DEFAULT_ADMIN_MESSAGE);
+      toast.success('Incident verified & reassurance message sent to resident.');
     } catch (e: any) {
       toast.error(e?.message ?? 'Could not verify.');
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!canAct) { toast.error('Only officials can send alert messages.'); return; }
+    setLoading('message');
+    try {
+      await sendAdminMessage(incident.id, uid, DEFAULT_ADMIN_MESSAGE);
+      toast.success('Reassurance message sent to resident.');
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Could not send message.');
     } finally {
       setLoading(null);
     }
@@ -167,6 +181,60 @@ export default function IncidentDetailPanel({
           <p className="text-sm font-semibold text-gray-700">Reported By</p>
           <p className="text-xs text-gray-500 mt-1 font-mono">{reporterName}</p>
         </div>
+
+        {/* Responders On The Way */}
+        {incident.respondersOnTheWay && incident.respondersOnTheWay.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <p className="text-xs font-bold text-amber-900 flex items-center gap-1.5 mb-2">
+              <Radio size={14} className="text-amber-600 animate-pulse" />
+              Responders On The Way ({incident.respondersOnTheWay.length})
+            </p>
+            <div className="space-y-1.5">
+              {incident.respondersOnTheWay.map((r) => (
+                <div key={r.uid} className="flex items-center justify-between bg-white/80 rounded-lg px-2.5 py-1.5 text-xs border border-amber-100">
+                  <span className="font-semibold text-gray-800">{r.displayName}</span>
+                  <span className="text-[10px] font-bold bg-amber-500 text-white px-2 py-0.5 rounded-full">
+                    On the way
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Resident Communication / Admin Message */}
+        {incident.adminMessage ? (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900 mb-1">
+              <MessageSquare size={14} className="text-blue-600" />
+              Message Sent to Resident
+            </div>
+            <p className="text-xs text-blue-950 font-medium italic">
+              "{incident.adminMessage}"
+            </p>
+            {incident.adminMessageSentAt && (
+              <p className="text-[10px] text-blue-600 mt-1">
+                Sent {formatRelativeTime(incident.adminMessageSentAt)}
+              </p>
+            )}
+          </div>
+        ) : incident.status === 'verified' && canAct && (
+          <div className="border border-blue-100 bg-blue-50/50 rounded-xl p-3">
+            <p className="text-xs text-gray-600 mb-2">
+              Notify the resident that help is on the way:
+            </p>
+            <button
+              onClick={handleSendMessage}
+              disabled={loading === 'message'}
+              className="w-full flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium py-1.5 px-3 rounded-lg text-xs transition-colors shadow-xs"
+            >
+              <Send size={13} />
+              {loading === 'message'
+                ? 'Sending...'
+                : 'Send: "The emergency has been received..."'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Actions  EModule 8: Incident Verification & Resolution */}
@@ -183,14 +251,26 @@ export default function IncidentDetailPanel({
             </button>
           )}
           {incident.status === 'verified' && (
-            <button
-              onClick={handleResolve}
-              disabled={loading === 'resolve'}
-              className="w-full flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-800 text-white font-semibold h-10 rounded-lg disabled:opacity-60 text-sm"
-            >
-              <XCircle size={16} />
-              {loading === 'resolve' ? 'Resolving...' : 'Mark as Resolved'}
-            </button>
+            <>
+              {!incident.adminMessage && (
+                <button
+                  onClick={handleSendMessage}
+                  disabled={loading === 'message'}
+                  className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold h-10 rounded-lg disabled:opacity-60 text-sm"
+                >
+                  <Send size={16} />
+                  {loading === 'message' ? 'Sending message...' : 'Send Reassurance Message'}
+                </button>
+              )}
+              <button
+                onClick={handleResolve}
+                disabled={loading === 'resolve'}
+                className="w-full flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-800 text-white font-semibold h-10 rounded-lg disabled:opacity-60 text-sm"
+              >
+                <XCircle size={16} />
+                {loading === 'resolve' ? 'Resolving...' : 'Mark as Resolved'}
+              </button>
+            </>
           )}
         </div>
       )}

@@ -28,7 +28,14 @@ import { Timestamp } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 import { useLocation } from '../hooks/useLocation';
 import { submitEmergencyAlert, subscribeToMyIncidents } from '../services/incidentService';
-import { STATUS_COLORS, STATUS_LABELS, formatRelativeTime, formatResponseTime } from '../utils/incidentUtils';
+import {
+  STATUS_COLORS,
+  STATUS_LABELS,
+  formatRelativeTime,
+  formatResponseTime,
+  calculateDistanceMeters,
+  formatDistance,
+} from '../utils/incidentUtils';
 import type { IncidentDocument } from '../types';
 
 type Severity = 'light' | 'moderate' | 'extreme';
@@ -48,12 +55,32 @@ export default function AlertScreen() {
   const [severity, setSeverity] = useState<Severity>('moderate');
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [chipExpanded, setChipExpanded] = useState(false);
 
   useEffect(() => {
     if (!uid) return;
     const unsub = subscribeToMyIncidents(uid, setIncidents);
     return () => unsub();
   }, [uid]);
+
+  // Active / most recent alert
+  const activeIncident = incidents.find((i) => i.status !== 'resolved') ?? incidents[0];
+  const respondersOnTheWay = activeIncident?.respondersOnTheWay ?? [];
+  const responderCount = respondersOnTheWay.length;
+
+  const closestDistance =
+    responderCount > 0 && (activeIncident?.location || coords)
+      ? Math.min(
+          ...respondersOnTheWay.map((r) =>
+            calculateDistanceMeters(
+              r.latitude,
+              r.longitude,
+              activeIncident?.location?.latitude ?? coords!.latitude,
+              activeIncident?.location?.longitude ?? coords!.longitude
+            )
+          )
+        )
+      : null;
 
   const handleOpenMaps = () => {
     if (!coords) return;
@@ -168,6 +195,96 @@ export default function AlertScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {/* Center Upper Section: Responder Indicator Chip & Admin Message */}
+      <View style={styles.upperCenterSection}>
+        {/* Responder Chip */}
+        <TouchableOpacity
+          style={[
+            styles.responderChip,
+            responderCount > 0
+              ? styles.responderChipActive
+              : activeIncident?.status === 'verified'
+              ? styles.responderChipVerified
+              : activeIncident
+              ? styles.responderChipPending
+              : styles.responderChipStandby,
+          ]}
+          onPress={() => responderCount > 0 && setChipExpanded(!chipExpanded)}
+          activeOpacity={responderCount > 0 ? 0.75 : 1}
+        >
+          <View style={styles.chipInnerRow}>
+            <Text style={styles.chipEmoji}>
+              {responderCount > 0 ? '🚨' : activeIncident?.status === 'verified' ? '🛡️' : activeIncident ? '⏳' : '📡'}
+            </Text>
+            <Text
+              style={[
+                styles.chipText,
+                responderCount > 0
+                  ? styles.chipTextActive
+                  : activeIncident?.status === 'verified'
+                  ? styles.chipTextVerified
+                  : styles.chipTextDefault,
+              ]}
+            >
+              {responderCount > 0
+                ? `${responderCount} ${responderCount === 1 ? 'Responder' : 'Responders'} on the way · ${closestDistance !== null ? formatDistance(closestDistance) + ' away' : 'en route'}`
+                : activeIncident?.status === 'verified'
+                ? 'Alert Verified · Responders dispatching'
+                : activeIncident
+                ? 'Emergency Alert Sent · Awaiting verification'
+                : 'Emergency Response Active'}
+            </Text>
+            {responderCount > 0 && (
+              <Text style={styles.chipChevron}>{chipExpanded ? '▲' : '▼'}</Text>
+            )}
+          </View>
+        </TouchableOpacity>
+
+        {/* Expanded Responder details */}
+        {chipExpanded && responderCount > 0 && (
+          <View style={styles.expandedResponderBox}>
+            <Text style={styles.expandedResponderTitle}>Approaching Field Responders:</Text>
+            {respondersOnTheWay.map((r) => {
+              const dist = activeIncident?.location
+                ? calculateDistanceMeters(
+                    r.latitude,
+                    r.longitude,
+                    activeIncident.location.latitude,
+                    activeIncident.location.longitude
+                  )
+                : null;
+              return (
+                <View key={r.uid} style={styles.responderRow}>
+                  <Text style={styles.responderName}>👤 {r.displayName}</Text>
+                  <Text style={styles.responderDistance}>
+                    {dist !== null ? `${formatDistance(dist)} away` : 'On the way'}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Admin Verification Message */}
+        {activeIncident?.adminMessage && (
+          <View style={styles.adminMessageCard}>
+            <View style={styles.adminMessageHeader}>
+              <View style={styles.adminBadge}>
+                <Text style={styles.adminBadgeText}>BARANGAY OFFICIAL MESSAGE</Text>
+              </View>
+              {activeIncident.adminMessageSentAt && (
+                <Text style={styles.adminMessageTime}>
+                  {formatRelativeTime(activeIncident.adminMessageSentAt as Timestamp)}
+                </Text>
+              )}
+            </View>
+            <Text style={styles.adminMessageText}>
+              "{activeIncident.adminMessage}"
+            </Text>
+          </View>
+        )}
+      </View>
+
       {/* Header */}
       <View style={styles.headerRow}>
         <View>
@@ -542,4 +659,145 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   removePhotoBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+
+  /* Center Upper Section & Responder Chip */
+  upperCenterSection: {
+    width: '100%',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+  },
+  responderChip: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 25,
+    borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    maxWidth: '100%',
+  },
+  responderChipActive: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#EF4444',
+  },
+  responderChipVerified: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#10B981',
+  },
+  responderChipPending: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#F59E0B',
+  },
+  responderChipStandby: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+  },
+  chipInnerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  chipEmoji: {
+    fontSize: 16,
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  chipTextActive: {
+    color: '#B91C1C',
+  },
+  chipTextVerified: {
+    color: '#065F46',
+  },
+  chipTextDefault: {
+    color: '#4B5563',
+  },
+  chipChevron: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginLeft: 2,
+  },
+  expandedResponderBox: {
+    width: '100%',
+    backgroundColor: '#FEF2F2',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    padding: 12,
+    gap: 8,
+  },
+  expandedResponderTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#991B1B',
+    textTransform: 'uppercase',
+  },
+  responderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+  },
+  responderName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  responderDistance: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#DC2626',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  adminMessageCard: {
+    width: '100%',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#93C5FD',
+    padding: 14,
+    gap: 6,
+    shadowColor: '#1D4ED8',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  adminMessageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  adminBadge: {
+    backgroundColor: '#1D4ED8',
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+  },
+  adminBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  adminMessageTime: {
+    fontSize: 11,
+    color: '#6B7280',
+  },
+  adminMessageText: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    fontWeight: '600',
+    color: '#1E3A8A',
+    lineHeight: 18,
+  },
 });

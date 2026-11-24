@@ -7,9 +7,17 @@ import { Timestamp, GeoPoint } from 'firebase/firestore';
 
 // ─── User roles ───────────────────────────────────────────────────────────────
 
-export type UserRole = 'resident' | 'official';
+export type UserRole = 'resident' | 'official' | 'admin' | 'responder' | 'tanod';
 
 // ─── Firestore document shapes ────────────────────────────────────────────────
+
+export interface ResponderOnTheWay {
+  uid: string;
+  displayName: string;
+  latitude: number;
+  longitude: number;
+  respondedAt?: Timestamp | string;
+}
 
 /**
  * users/{uid}
@@ -47,6 +55,21 @@ export interface IncidentDocument {
   resolvedBy?: string;        // uid of the official who resolved
   resolvedAt?: Timestamp;
   photoBase64?: string;
+  adminMessage?: string;
+  adminMessageSentAt?: Timestamp;
+  respondersOnTheWay?: ResponderOnTheWay[];
+}
+
+export interface ResponderLocation {
+  uid: string;
+  displayName: string;
+  role?: string;
+  latitude: number;
+  longitude: number;
+  isVisible: boolean;
+  status?: 'available' | 'on_the_way';
+  activeIncidentId?: string | null;
+  lastSeen?: Timestamp;
 }
 
 // ─── Navigation param types ───────────────────────────────────────────────────
@@ -68,4 +91,6 @@ export type AppStackParamList = {
   Home: undefined;
   Alert: undefined;
   Official: undefined;
+  Tanod: undefined;
+  Responder: undefined;
 };

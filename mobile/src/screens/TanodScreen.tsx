@@ -34,6 +34,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useIncidents } from '../hooks/useIncidents';
 import { signOut } from '../services/authService';
 import { startLocationBroadcast } from '../services/tanodLocationService';
+import { setResponderOnTheWay } from '../services/incidentService';
 import {
   STATUS_COLORS,
   STATUS_LABELS,
@@ -60,10 +61,15 @@ export default function TanodScreen() {
   const { incidents, loading } = useIncidents(refreshKey);
 
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
+  const [broadcastEnabled, setBroadcastEnabled] = useState(true);
 
   useEffect(() => {
-    if (userDoc?.role !== 'tanod') return;
-    if (!uid) return;
+    if (userDoc?.role !== 'tanod' && userDoc?.role !== 'responder') return;
+    if (!uid || !broadcastEnabled) {
+      locationSubRef.current?.remove();
+      locationSubRef.current = null;
+      return;
+    }
 
     startLocationBroadcast(uid, userDoc.displayName ?? '')
       .then((sub) => {
@@ -76,7 +82,33 @@ export default function TanodScreen() {
     return () => {
       locationSubRef.current?.remove();
     };
-  }, [uid, userDoc?.role]);
+  }, [uid, userDoc?.role, broadcastEnabled]);
+
+  const handleToggleOnTheWay = async (incident: IncidentDocument) => {
+    if (!uid) return;
+    const isOnTheWay = incident.respondersOnTheWay?.some((r) => r.uid === uid);
+    try {
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      await setResponderOnTheWay(
+        incident.id,
+        {
+          uid,
+          displayName: userDoc?.displayName ?? 'Responder',
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+        },
+        !isOnTheWay
+      );
+      Alert.alert(
+        !isOnTheWay ? 'Status: On The Way 🚨' : 'Status Updated',
+        !isOnTheWay
+          ? 'You are marked as On The Way! Location shared with resident.'
+          : 'You are no longer marked on the way.'
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err?.message ?? 'Could not update response status.');
+    }
+  };
 
   const filtered = filter === 'all'
     ? incidents
@@ -181,6 +213,24 @@ export default function TanodScreen() {
               />
             )}
 
+            {/* On the way action button */}
+            <TouchableOpacity
+              style={[
+                styles.onTheWayBtn,
+                item.respondersOnTheWay?.some((r) => r.uid === uid) && styles.onTheWayBtnActive,
+              ]}
+              onPress={() => handleToggleOnTheWay(item)}
+            >
+              <Text style={[
+                styles.onTheWayBtnText,
+                item.respondersOnTheWay?.some((r) => r.uid === uid) && styles.onTheWayBtnTextActive,
+              ]}>
+                {item.respondersOnTheWay?.some((r) => r.uid === uid)
+                  ? '✓ You are On The Way (Tap to Cancel)'
+                  : '🚨 On The Way'}
+              </Text>
+            </TouchableOpacity>
+
             <View style={styles.roleNote}>
               <Text style={styles.roleNoteText}>
                 Verification and resolution are handled by barangay officials.
@@ -209,9 +259,19 @@ export default function TanodScreen() {
             Hi, {userDoc?.displayName ?? '...'} · Tanod
           </Text>
         </View>
-        <TouchableOpacity onPress={handleSignOut}>
-          <Text style={styles.signOut}>Sign out</Text>
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={[styles.toggleBtn, broadcastEnabled ? styles.toggleBtnActive : styles.toggleBtnInactive]}
+            onPress={() => setBroadcastEnabled(!broadcastEnabled)}
+          >
+            <Text style={[styles.toggleBtnText, broadcastEnabled ? styles.toggleBtnTextActive : styles.toggleBtnTextInactive]}>
+              {broadcastEnabled ? '📍 Visible' : '⚪ Hidden'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleSignOut}>
+            <Text style={styles.signOut}>Sign out</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Alert badge */}
@@ -385,4 +445,57 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   incidentPhoto: { width: '100%', height: 140, borderRadius: 10, marginTop: 8 },
+  onTheWayBtn: {
+    backgroundColor: '#DC2626',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 10,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  onTheWayBtnActive: {
+    backgroundColor: '#059669',
+    shadowColor: '#059669',
+  },
+  onTheWayBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  onTheWayBtnTextActive: {
+    color: '#fff',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  toggleBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  toggleBtnActive: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#10B981',
+  },
+  toggleBtnInactive: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#D1D5DB',
+  },
+  toggleBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  toggleBtnTextActive: {
+    color: '#065F46',
+  },
+  toggleBtnTextInactive: {
+    color: '#6B7280',
+  },
 });

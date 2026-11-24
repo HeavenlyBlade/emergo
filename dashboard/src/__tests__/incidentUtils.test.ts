@@ -16,6 +16,8 @@ import {
   STATUS_COLORS,
   STATUS_LABELS,
   STATUS_BG,
+  calculateDistanceMeters,
+  formatDistance,
 } from '../utils/incidentUtils'
 
 // Helper — creates a fake TimestampLike from a date
@@ -111,4 +113,21 @@ describe('STATUS_LABELS', () => {
     expect(STATUS_LABELS.verified).toBe('Verified')
     expect(STATUS_LABELS.resolved).toBe('Resolved')
   })
+})
+
+describe('distance calculations', () => {
+  it('calculates distance between two points accurately', () => {
+    expect(calculateDistanceMeters(13.9374, 121.6175, 13.9374, 121.6175)).toBe(0);
+    const dist = calculateDistanceMeters(13.9374, 121.6175, 13.9384, 121.6175);
+    expect(dist).toBeGreaterThan(100);
+    expect(dist).toBeLessThan(125);
+  });
+
+  it('formats distance nicely for meters and kilometers', () => {
+    expect(formatDistance(50)).toBe('50m');
+    expect(formatDistance(450.4)).toBe('450m');
+    expect(formatDistance(999)).toBe('999m');
+    expect(formatDistance(1000)).toBe('1.0km');
+    expect(formatDistance(2500)).toBe('2.5km');
+  });
 })

@@ -35,7 +35,7 @@ import {
   serverTimestamp,
   where,
 } from 'firebase/firestore';
-import { signInAnonymously, signOut as firebaseSignOut } from 'firebase/auth';
+import { signInAnonymously, signOut as firebaseSignOut, getIdToken } from 'firebase/auth';
 import { db, auth } from './firebase';
 import type { UserDocument } from '../types';
 
@@ -107,11 +107,27 @@ export async function signInWithCredentials(
     throw new Error('Username and password are required.');
   }
 
-  await signInAnonymously(auth);
+  try {
+    const anonResult = await signInAnonymously(auth);
+    // Force the ID token to be fetched and cached by the Firebase SDK before
+    // making any Firestore requests. Without this, getDocs can fire before the
+    // auth token is attached to the Firestore gRPC channel, causing a
+    // "Missing or insufficient permissions" error on the hosted site (where
+    // there is no warm cached session, unlike localhost).
+    await getIdToken(anonResult.user, /* forceRefresh */ false);
+  } catch (anonErr: any) {
+    throw new Error(`Auth init failed: ${anonErr?.message ?? anonErr}`);
+  }
 
   const usersRef = collection(db, 'users');
   const q = query(usersRef, where('username', '==', username.trim().toLowerCase()));
-  const snap = await getDocs(q);
+  let snap;
+  try {
+    snap = await getDocs(q);
+  } catch (dbErr: any) {
+    await firebaseSignOut(auth);
+    throw new Error(`Database error: ${dbErr?.message ?? dbErr}`);
+  }
 
   if (snap.empty) {
     await firebaseSignOut(auth);
@@ -139,6 +155,9 @@ export async function signInWithCredentials(
   }
 
   const emergoUid = userSnap.id;
+  // Store the session key BEFORE onAuthStateChanged can fire again.
+  // signInAnonymously already triggered onAuthStateChanged once — storing
+  // the key now ensures any subsequent listener invocation finds it.
   localStorage.setItem(SESSION_KEY, emergoUid);
 
   return { uid: emergoUid, ...userData } as UserDocument;
@@ -183,7 +202,7 @@ export async function getUserDocument(uid: string): Promise<UserDocument | null>
 export async function createOfficialAccount(
   username: string,
   password: string,
-  role: 'official',
+  role: 'official' | 'admin' | 'responder' = 'official',
   displayName: string,
   phoneNumber: string
 ): Promise<void> {

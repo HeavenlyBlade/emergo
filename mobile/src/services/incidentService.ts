@@ -27,10 +27,13 @@ import {
   Timestamp,
   type Unsubscribe,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, ensureAnonymousAuth } from './firebase';
 import { getCurrentLocation } from './locationService';
 import { notifyOfficialsAndTanods } from './notificationService';
-import type { IncidentDocument } from '../types';
+import type { IncidentDocument, ResponderOnTheWay } from '../types';
+
+export const DEFAULT_ADMIN_MESSAGE =
+  'The emergency has been received and responders will arrive shortly.';
 
 // ─── Submit alert ─────────────────────────────────────────────────────────────
 
@@ -40,6 +43,7 @@ export async function submitEmergencyAlert(
   severity?: 'light' | 'moderate' | 'extreme',
   photoBase64?: string
 ): Promise<string> {
+  await ensureAnonymousAuth();
   // If the device is offline, the Firestore addDoc call below will throw
   // and the caller (AlertScreen) will display the error to the user.
 
@@ -55,7 +59,15 @@ export async function submitEmergencyAlert(
   );
   const recentSnap = await getDocs(recentQuery);
   if (!recentSnap.empty) {
-    throw new Error('Please wait before submitting another alert.');
+    const lastAlert = recentSnap.docs[0].data();
+    const reportedAt = (lastAlert.reportedAt as Timestamp).toDate();
+    const secondsLeft = Math.ceil((reportedAt.getTime() + 5 * 60 * 1000 - Date.now()) / 1000);
+    const minutes = Math.floor(secondsLeft / 60);
+    const seconds = secondsLeft % 60;
+    const timeStr = minutes > 0
+      ? `${minutes}m ${seconds}s`
+      : `${seconds}s`;
+    throw new Error(`Please wait ${timeStr} before submitting another alert.`);
   }
 
   const coords = await getCurrentLocation();
@@ -99,7 +111,7 @@ export function subscribeToMyIncidents(
   return onSnapshot(
     q,
     (snap) => {
-      const incidents = snap.docs.map((d) => ({
+      const incidents = snap.docs.map((d: any) => ({
         id: d.id,
         ...d.data(),
       })) as IncidentDocument[];
@@ -132,7 +144,7 @@ export async function verifyIncident(
   await assertOfficial(officialUid);
 
   const incidentRef = doc(db, 'incidents', incidentId);
-  await runTransaction(db, async (transaction) => {
+  await runTransaction(db, async (transaction: any) => {
     const snap = await transaction.get(incidentRef);
     if (!snap.exists()) throw new Error('Incident not found.');
 
@@ -164,7 +176,7 @@ export async function resolveIncident(
   await assertOfficial(officialUid);
 
   const incidentRef = doc(db, 'incidents', incidentId);
-  await runTransaction(db, async (transaction) => {
+  await runTransaction(db, async (transaction: any) => {
     const snap = await transaction.get(incidentRef);
     if (!snap.exists()) throw new Error('Incident not found.');
     if (snap.data().status === 'resolved') throw new Error('Already resolved.');
@@ -174,5 +186,49 @@ export async function resolveIncident(
       resolvedBy: officialUid,
       resolvedAt: serverTimestamp(),
     });
+  });
+}
+
+export async function sendAdminMessage(
+  incidentId: string,
+  officialUid: string,
+  message: string = DEFAULT_ADMIN_MESSAGE
+): Promise<void> {
+  await assertOfficial(officialUid);
+  const incidentRef = doc(db, 'incidents', incidentId);
+  await updateDoc(incidentRef, {
+    adminMessage: message,
+    adminMessageSentAt: serverTimestamp(),
+  });
+}
+
+export async function setResponderOnTheWay(
+  incidentId: string,
+  responder: { uid: string; displayName: string; latitude: number; longitude: number },
+  isOnTheWay: boolean
+): Promise<void> {
+  const incidentRef = doc(db, 'incidents', incidentId);
+  await runTransaction(db, async (tx: any) => {
+    const snap = await tx.get(incidentRef);
+    if (!snap.exists()) throw new Error('Incident not found.');
+
+    const currentList: ResponderOnTheWay[] = snap.data().respondersOnTheWay ?? [];
+    let updatedList: ResponderOnTheWay[];
+    if (isOnTheWay) {
+      updatedList = [
+        ...currentList.filter((r) => r.uid !== responder.uid),
+        {
+          uid: responder.uid,
+          displayName: responder.displayName,
+          latitude: responder.latitude,
+          longitude: responder.longitude,
+          respondedAt: new Date().toISOString(),
+        },
+      ];
+    } else {
+      updatedList = currentList.filter((r) => r.uid !== responder.uid);
+    }
+
+    tx.update(incidentRef, { respondersOnTheWay: updatedList });
   });
 }

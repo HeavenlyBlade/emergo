@@ -25,6 +25,8 @@ export default function HomeScreen({ navigation }: Props) {
       navigation.replace('Alert');
     } else if (userDoc.role === 'official') {
       navigation.replace('Official');
+    } else if (userDoc.role === 'tanod' || userDoc.role === 'responder') {
+      navigation.replace('Tanod');
     }
   }, [userDoc, navigation]);
 

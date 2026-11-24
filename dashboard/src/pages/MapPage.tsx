@@ -17,7 +17,7 @@
  * before the next is shown. Auto-dismisses after 5 minutes.
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { collection, onSnapshot } from 'firebase/firestore';
@@ -27,17 +27,27 @@ import { useUsers } from '../hooks/useUsers';
 import { useAuth } from '../hooks/useAuth';
 import { useAlarmSound } from '../hooks/useAlarmSound';
 import type { IncidentDocument } from '../types';
-import { STATUS_COLORS, STATUS_LABELS, STATUS_BG, formatRelativeTime } from '../utils/incidentUtils';
+import {
+  STATUS_COLORS,
+  STATUS_LABELS,
+  STATUS_BG,
+  formatRelativeTime,
+  calculateDistanceMeters,
+  formatDistance,
+} from '../utils/incidentUtils';
 import IncidentDetailPanel from '../components/IncidentDetailPanel';
 import Sidebar from '../components/Sidebar';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Eye, EyeOff, Radio } from 'lucide-react';
 
 interface TanodLocation {
   uid: string;
   latitude: number;
   longitude: number;
-  lastSeen: { toDate: () => Date };
+  lastSeen?: { toDate: () => Date };
   displayName: string;
+  isVisible?: boolean;
+  status?: 'available' | 'on_the_way';
+  activeIncidentId?: string | null;
 }
 
 // Center on Barangay Marketview, Lucena City
@@ -61,29 +71,74 @@ export default function MapPage() {
   const { uid, userDoc } = useAuth();
   const [selected, setSelected] = useState<IncidentDocument | null>(null);
   const [tanodLocations, setTanodLocations] = useState<TanodLocation[]>([]);
+  const [revealResponders, setRevealResponders] = useState(true);
 
   // ── Alarm & modal state ──────────────────────────────────────────────
   const { startAlarm, stopAlarm } = useAlarmSound();
   const [alertQueue, setAlertQueue] = useState<IncidentDocument[]>([]);
 
-  // ── Tanod location listener ──────────────────────────────────────────
+  // ── Responder / Tanod location listener ──────────────────────────────
   useEffect(() => {
-    if (userDoc?.role !== 'official') return;
+    if (!userDoc || (userDoc.role !== 'official' && userDoc.role !== 'admin' && userDoc.role !== 'responder')) return;
 
-    const unsub = onSnapshot(collection(db, 'tanod_locations'), (snapshot) => {
+    // Listen to responder_locations
+    const unsubResponders = onSnapshot(collection(db, 'responder_locations'), (snapshot) => {
       const now = new Date().getTime();
       const locations = snapshot.docs
         .map((d) => ({ uid: d.id, ...d.data() } as TanodLocation))
         .filter(
           (loc) =>
-            loc.lastSeen &&
-            now - loc.lastSeen.toDate().getTime() < 5 * 60 * 1000
+            loc.isVisible !== false &&
+            (!loc.lastSeen || now - loc.lastSeen.toDate().getTime() < 10 * 60 * 1000)
         );
-      setTanodLocations(locations);
+      
+      setTanodLocations((prev) => {
+        const merged = new Map<string, TanodLocation>();
+        prev.forEach((p) => merged.set(p.uid, p));
+        locations.forEach((l) => merged.set(l.uid, l));
+        return Array.from(merged.values());
+      });
     });
 
-    return () => unsub();
+    // Listen to tanod_locations for backward compatibility
+    const unsubTanods = onSnapshot(collection(db, 'tanod_locations'), (snapshot) => {
+      const now = new Date().getTime();
+      const locations = snapshot.docs
+        .map((d) => ({ uid: d.id, ...d.data() } as TanodLocation))
+        .filter(
+          (loc) =>
+            loc.isVisible !== false &&
+            (!loc.lastSeen || now - loc.lastSeen.toDate().getTime() < 10 * 60 * 1000)
+        );
+      setTanodLocations((prev) => {
+        const merged = new Map<string, TanodLocation>();
+        prev.forEach((p) => merged.set(p.uid, p));
+        locations.forEach((l) => merged.set(l.uid, l));
+        return Array.from(merged.values());
+      });
+    });
+
+    return () => {
+      unsubResponders();
+      unsubTanods();
+    };
   }, [userDoc?.role]);
+
+  // Nearest responders to selected incident
+  const respondersNearSelected = useMemo(() => {
+    if (!selected?.location) return [];
+    return tanodLocations
+      .map((r) => {
+        const distanceMeters = calculateDistanceMeters(
+          selected.location.latitude,
+          selected.location.longitude,
+          r.latitude,
+          r.longitude
+        );
+        return { ...r, distanceMeters };
+      })
+      .sort((a, b) => a.distanceMeters - b.distanceMeters);
+  }, [selected, tanodLocations]);
 
   // ── New-incident detector ────────────────────────────────────────────
   useEffect(() => {
@@ -149,30 +204,79 @@ export default function MapPage() {
               {incidents.filter(i => i.status === 'resolved').length} resolved
             </p>
           </div>
-          {/* Legend */}
-          <div className="flex gap-4 text-xs text-gray-600">
-            {(Object.entries(STATUS_LABELS) as [keyof typeof STATUS_COLORS, string][]).map(
-              ([status, label]) => (
-                <span key={status} className="flex items-center gap-1">
-                  <span
-                    className="w-3 h-3 rounded-full inline-block"
-                    style={{ backgroundColor: STATUS_COLORS[status] }}
-                  />
-                  {label}
-                </span>
-              )
-            )}
-            {userDoc?.role === 'official' && (
+          {/* Controls & Legend */}
+          <div className="flex items-center gap-4 text-xs text-gray-600">
+            {/* Toggle to reveal responders */}
+            <button
+              onClick={() => setRevealResponders((v) => !v)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition-all border ${
+                revealResponders
+                  ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-xs'
+                  : 'bg-gray-100 border-gray-300 text-gray-500'
+              }`}
+              title="Toggle responder locations on map"
+            >
+              {revealResponders ? <Eye size={15} /> : <EyeOff size={15} />}
+              <span>{revealResponders ? 'Responders Visible' : 'Responders Hidden'}</span>
+              <span className="bg-blue-600 text-white text-[11px] font-bold px-1.5 py-0.2 rounded-full">
+                {tanodLocations.length}
+              </span>
+            </button>
+
+            <div className="hidden lg:flex gap-3">
+              {(Object.entries(STATUS_LABELS) as [keyof typeof STATUS_COLORS, string][]).map(
+                ([status, label]) => (
+                  <span key={status} className="flex items-center gap-1">
+                    <span
+                      className="w-3 h-3 rounded-full inline-block"
+                      style={{ backgroundColor: STATUS_COLORS[status] }}
+                    />
+                    {label}
+                  </span>
+                )
+              )}
               <span className="flex items-center gap-1">
                 <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: '#1D4ED8' }} />
-                Official (live)
+                Responder (live)
               </span>
-            )}
+            </div>
           </div>
         </div>
 
         {/* Map + detail panel row */}
-        <div className="flex flex-1 overflow-hidden min-h-0">
+        <div className="flex flex-1 overflow-hidden min-h-0 relative">
+          {/* Nearby responders banner when an incident is selected */}
+          {selected && respondersNearSelected.length > 0 && revealResponders && (
+            <div className="absolute top-3 left-14 z-1000 bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-blue-200 px-4 py-2.5 max-w-lg">
+              <div className="flex items-center gap-2 mb-1.5">
+                <Radio className="w-4 h-4 text-blue-600 animate-pulse" />
+                <span className="text-xs font-bold text-gray-800">
+                  Responders Near This Emergency ({respondersNearSelected.length})
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                {respondersNearSelected.slice(0, 3).map((r) => (
+                  <span
+                    key={r.uid}
+                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md font-medium ${
+                      r.status === 'on_the_way'
+                        ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                        : 'bg-blue-50 text-blue-800 border border-blue-200'
+                    }`}
+                  >
+                    <span>{r.displayName}</span>
+                    <span className="font-mono font-bold text-[11px] text-blue-700">
+                      {formatDistance(r.distanceMeters)}
+                    </span>
+                    {r.status === 'on_the_way' && (
+                      <span className="text-[10px] bg-amber-500 text-white font-bold px-1 rounded">On the way</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Map */}
           <div className="flex-1 relative min-h-0 min-w-0">
             <MapContainer
@@ -228,26 +332,50 @@ export default function MapPage() {
                 );
               })}
 
-              {tanodLocations.map((tanod) => (
-                <CircleMarker
-                  key={`tanod-${tanod.uid}`}
-                  center={[tanod.latitude, tanod.longitude]}
-                  radius={8}
-                  pathOptions={{
-                    color: '#1D4ED8',
-                    fillColor: '#1D4ED8',
-                    fillOpacity: 0.9,
-                    weight: 2,
-                  }}
-                >
-                  <Popup>
-                    <div className="text-sm">
-                      <p className="font-semibold text-blue-700">Official (live)</p>
-                      <p>{tanod.displayName}</p>
-                    </div>
-                  </Popup>
-                </CircleMarker>
-              ))}
+              {revealResponders &&
+                tanodLocations.map((tanod) => {
+                  const dist = selected?.location
+                    ? calculateDistanceMeters(
+                        selected.location.latitude,
+                        selected.location.longitude,
+                        tanod.latitude,
+                        tanod.longitude
+                      )
+                    : null;
+                  const isOnTheWay = tanod.status === 'on_the_way';
+
+                  return (
+                    <CircleMarker
+                      key={`tanod-${tanod.uid}`}
+                      center={[tanod.latitude, tanod.longitude]}
+                      radius={isOnTheWay ? 10 : 8}
+                      pathOptions={{
+                        color: isOnTheWay ? '#D97706' : '#1D4ED8',
+                        fillColor: isOnTheWay ? '#F59E0B' : '#2563EB',
+                        fillOpacity: 0.9,
+                        weight: 2,
+                      }}
+                    >
+                      <Popup>
+                        <div className="text-sm">
+                          <div className="flex items-center gap-1.5 font-semibold text-blue-700 mb-0.5">
+                            <span className="w-2 h-2 rounded-full bg-blue-600 inline-block animate-ping" />
+                            <span>Responder (live)</span>
+                          </div>
+                          <p className="font-bold text-gray-800">{tanod.displayName}</p>
+                          <p className="text-xs text-gray-500 capitalize">
+                            Status: <span className="font-medium text-gray-700">{isOnTheWay ? '🚨 On the way' : '🟢 Available'}</span>
+                          </p>
+                          {dist !== null && (
+                            <p className="text-xs font-semibold text-blue-700 mt-1">
+                              Distance to selected emergency: {formatDistance(dist)}
+                            </p>
+                          )}
+                        </div>
+                      </Popup>
+                    </CircleMarker>
+                  );
+                })}
             </MapContainer>
           </div>
 

@@ -7,7 +7,7 @@
  * At runtime these are still Firestore GeoPoint/Timestamp instances.
  */
 
-export type UserRole = 'resident' | 'official';
+export type UserRole = 'resident' | 'official' | 'admin' | 'responder' | 'tanod';
 
 export interface UserDocument {
   uid: string;
@@ -33,6 +33,14 @@ export interface TimestampLike {
   toDate: () => Date;
 }
 
+export interface ResponderOnTheWay {
+  uid: string;
+  displayName: string;
+  latitude: number;
+  longitude: number;
+  respondedAt?: TimestampLike | string;
+}
+
 export interface IncidentDocument {
   id: string;
   status: IncidentStatus;
@@ -46,4 +54,19 @@ export interface IncidentDocument {
   resolvedBy?: string;
   resolvedAt?: TimestampLike;
   photoBase64?: string;
+  adminMessage?: string;
+  adminMessageSentAt?: TimestampLike;
+  respondersOnTheWay?: ResponderOnTheWay[];
+}
+
+export interface ResponderLocation {
+  uid: string;
+  displayName: string;
+  role?: string;
+  latitude: number;
+  longitude: number;
+  isVisible: boolean;
+  status?: 'available' | 'on_the_way';
+  activeIncidentId?: string | null;
+  lastSeen?: TimestampLike;
 }

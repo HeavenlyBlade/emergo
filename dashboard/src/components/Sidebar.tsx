@@ -1,22 +1,23 @@
 /**
- * Sidebar  Eshared navigation component
+ * Sidebar — shared navigation component
  */
 
 import { Link } from 'react-router-dom';
-import { Map, List, BarChart2, LogOut } from 'lucide-react';
+import { Map, List, BarChart2, Users, Radio, LogOut } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { signOut } from '../services/authService';
 import type { UserDocument } from '../types';
 
 interface Props {
-  active: 'map' | 'incidents' | 'admin';
+  active: 'map' | 'incidents' | 'admin' | 'accounts' | 'responder';
   userDoc: UserDocument | null;
 }
 
 const NAV = [
-  { key: 'map', label: 'Live Map', icon: Map, to: '/' },
-  { key: 'incidents', label: 'Incidents', icon: List, to: '/incidents' },
-  { key: 'admin', label: 'Records', icon: BarChart2, to: '/admin' },
+  { key: 'map',       label: 'Live Map',            icon: Map,       to: '/' },
+  { key: 'responder', label: 'Responder Map',       icon: Radio,     to: '/responder' },
+  { key: 'incidents', label: 'Incidents',           icon: List,      to: '/incidents' },
+  { key: 'admin',     label: 'Records',             icon: BarChart2, to: '/admin' },
 ];
 
 export default function Sidebar({ active, userDoc }: Props) {
@@ -68,6 +69,21 @@ export default function Sidebar({ active, userDoc }: Props) {
             <span className="hidden md:block text-sm font-medium">{label}</span>
           </Link>
         ))}
+
+        {/* Accounts — admin only */}
+        {userDoc?.role === 'admin' && (
+          <Link
+            to="/accounts"
+            className={`flex items-center gap-3 px-4 py-3 mx-2 rounded-lg transition-colors ${
+              active === 'accounts'
+                ? 'bg-red-700 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            <Users size={20} />
+            <span className="hidden md:block text-sm font-medium">Accounts</span>
+          </Link>
+        )}
       </nav>
 
       {/* User */}

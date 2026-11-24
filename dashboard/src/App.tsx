@@ -20,9 +20,8 @@ import LoginPage from './pages/LoginPage';
 import MapPage from './pages/MapPage';
 import IncidentsPage from './pages/IncidentsPage';
 import AdminPage from './pages/AdminPage';
-
-// Conditionally import DevLoginPage — tree-shaken out of production builds
-// import.meta.env.DEV is a compile-time constant in Vite
+import AccountsPage from './pages/AccountsPage';
+import ResponderPage from './pages/ResponderPage';
 import DevLoginPage from './pages/DevLoginPage';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -47,6 +46,14 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function RoleBasedHome() {
+  const { userDoc } = useAuth();
+  if (userDoc?.role === 'responder') {
+    return <ResponderPage />;
+  }
+  return <MapPage />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -59,9 +66,11 @@ export default function App() {
             element={<DevLoginPage onLogin={() => window.location.replace('/')} />}
           />
         )}
-        <Route path="/" element={<AuthGuard><MapPage /></AuthGuard>} />
+        <Route path="/" element={<AuthGuard><RoleBasedHome /></AuthGuard>} />
+        <Route path="/responder" element={<AuthGuard><ResponderPage /></AuthGuard>} />
         <Route path="/incidents" element={<AuthGuard><IncidentsPage /></AuthGuard>} />
         <Route path="/admin" element={<AuthGuard><AdminPage /></AuthGuard>} />
+        <Route path="/accounts" element={<AuthGuard><AccountsPage /></AuthGuard>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -19,6 +19,7 @@ import DisplayNameSetupScreen from '../screens/DisplayNameSetupScreen';
 import HomeScreen from '../screens/HomeScreen';
 import AlertScreen from '../screens/AlertScreen';
 import OfficialScreen from '../screens/OfficialScreen';
+import TanodScreen from '../screens/TanodScreen';
 import { AuthStackParamList, AppStackParamList } from '../types';
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -44,6 +45,8 @@ function AppNavigator() {
       <AppStack.Screen name="Home" component={HomeScreen} />
       <AppStack.Screen name="Alert" component={AlertScreen} />
       <AppStack.Screen name="Official" component={OfficialScreen} />
+      <AppStack.Screen name="Tanod" component={TanodScreen} />
+      <AppStack.Screen name="Responder" component={TanodScreen} />
     </AppStack.Navigator>
   );
 }

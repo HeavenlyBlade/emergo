@@ -62,10 +62,18 @@ export default function PhoneEntryScreen({ navigation }: Props) {
       await sendOtp(fullNumber);
       navigation.navigate('OtpVerify', { phoneNumber: fullNumber, mode });
     } catch (error: any) {
-      Alert.alert(
-        'Could not send code',
-        error?.message ?? 'Failed to send verification code. Please try again.'
-      );
+      const code = error?.code ?? '';
+      if (code === 'auth/network-request-failed' || error?.message?.includes('network')) {
+        Alert.alert(
+          'No Internet Connection',
+          'Could not reach the server. Please check your internet connection and try again.'
+        );
+      } else {
+        Alert.alert(
+          'Could not send code',
+          error?.message ?? 'Failed to send verification code. Please try again.'
+        );
+      }
     } finally {
       setLoading(false);
     }

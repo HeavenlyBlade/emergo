@@ -4,7 +4,7 @@
  */
 import * as Location from 'expo-location';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, ensureAnonymousAuth } from './firebase';
 
 export async function startLocationBroadcast(
   uid: string,
@@ -14,6 +14,8 @@ export async function startLocationBroadcast(
   if (status !== 'granted') {
     throw new Error('Location permission denied. Enable it in device settings.');
   }
+
+  await ensureAnonymousAuth();
 
   const subscription = await Location.watchPositionAsync(
     {

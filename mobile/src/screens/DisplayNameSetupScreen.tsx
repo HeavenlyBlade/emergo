@@ -40,7 +40,11 @@ export default function DisplayNameSetupScreen({ onAuthSuccess }: Props) {
       await saveDisplayName(uid, trimmed);
       onAuthSuccess();
     } catch (error: any) {
-      Alert.alert('Could not save name', error?.message ?? 'Please try again.');
+      const isNetwork = error?.code === 'auth/network-request-failed' || error?.message?.includes('network');
+      Alert.alert(
+        isNetwork ? 'No Internet Connection' : 'Could not save name',
+        isNetwork ? 'Please check your internet connection and try again.' : (error?.message ?? 'Please try again.')
+      );
     } finally {
       setLoading(false);
     }

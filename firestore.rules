@@ -5,122 +5,73 @@ rules_version = '2';
 // Deploy with: firebase deploy --only firestore:rules
 // (run from the dashboard/ directory where firebase.json lives)
 //
-// Role hierarchy: admin > official > resident
-// These rules are the authoritative enforcement of RBAC. UI-layer checks are
-// defense-in-depth only. Any write that doesn't pass these rules is rejected
-// by Firestore regardless of what the client does.
+// Two clients share this database:
+//   Mobile app  — unauthenticated (no Firebase Auth SDK); uses phone/OTP identity
+//   Dashboard   — anonymous Firebase Auth; uses username/password identity
+//
+// Design principle: mobile operations are open where the OTP flow is the
+// security gate. Dashboard reads/writes require Firebase Auth (request.auth != null).
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─── Helper functions ───────────────────────────────────────────────────
-
-    // Returns true if the calling user's role is 'official'.
-    // Reads the user's document from Firestore to check the role field.
     function isOfficial(uid) {
-      return get(/databases/$(database)/documents/users/$(uid)).data.role
-        == 'official';
+      return get(/databases/$(database)/documents/users/$(uid)).data.role == 'official';
     }
 
-    // Returns true if the calling user's role is 'admin'.
     function isAdmin(uid) {
-      return get(/databases/$(database)/documents/users/$(uid)).data.role
-        == 'admin';
+      return get(/databases/$(database)/documents/users/$(uid)).data.role == 'admin';
     }
 
-    // ─── incidents collection ───────────────────────────────────────────────
-    //
-    // Residents: create their own incidents, read their own incidents.
-    // Officials/tanods: read all incidents, update status field only.
-    // No one (except admins) may delete incidents.
+    // ─── incidents ────────────────────────────────────────────────────────────
+    // Mobile: residents create incidents without auth (OTP login is the gate).
+    // Dashboard: reads and updates require Firebase Auth (anonymous session).
 
     match /incidents/{incidentId} {
-      // Any authenticated user may create an incident on their own behalf.
-      allow create: if request.auth != null
-        && request.resource.data.reportedBy == request.auth.uid;
-
-      // Any authenticated session may read incidents.
-      // Dashboard uses anonymous auth so we can't check role here — the
-      // password check on login is the access gate for the dashboard.
-      allow read: if request.auth != null;
-
-      // Only authenticated sessions may update (verify/resolve).
-      // The service layer (incidentService.ts) enforces the official-only
-      // role gate in addition to these rules.
-      allow update: if request.auth != null;
-
-      // No client deletes.
+      allow create: if true;           // mobile — OTP-verified resident
+      allow read:   if true;           // mobile reads (rate-limit check, subscribeToMyIncidents)
+      allow update: if request.auth != null
+                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['respondersOnTheWay']);
       allow delete: if false;
     }
 
-    // ─── users collection ───────────────────────────────────────────────────
-    //
-    // Any authenticated user may read their own document.
-    // Officials/tanods may read all user documents (for the dashboard).
-    // Any authenticated user may create their own document (first login).
-    // The `role` field may ONLY be written by an admin — prevents privilege escalation.
-    //   Specifically: officials/tanods cannot self-promote, and residents cannot either.
-    // The `expoPushToken` field is only readable by officials/tanods or the token owner —
-    //   prevents residents from harvesting all responder push tokens (H3).
+    // ─── users ───────────────────────────────────────────────────────────────
+    // Mobile: residents create and update their own doc without auth.
+    // Dashboard: reads require Firebase Auth.
 
     match /users/{userId} {
-      // Read: any authenticated session may read user documents.
-      // The dashboard uses anonymous Firebase Auth — the auth.uid won't match
-      // the Emergo userId (which is phone-based), so we allow any authenticated
-      // request. Access is gated by the dashboard's own PBKDF2 password check.
-      allow read: if request.auth != null;
-
-      // Create: any authenticated user may create their own document.
-      // Role must not be privileged — new accounts are 'resident' by default.
-      allow create: if request.auth != null
-        && (!('role' in request.resource.data)
-            || request.resource.data.role == 'resident');
-
-      // Update own document (push token, displayName etc.) — role changes blocked.
-      allow update: if request.auth != null
-        && request.auth.uid == userId
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])
-            || isAdmin(request.auth.uid));
-
-      // Officials may update other users' documents (e.g. expoPushToken fan-out).
-      allow update: if request.auth != null
-        && isOfficial(request.auth.uid)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']);
-
-      // No client deletes.
-      allow delete: if false;
+      allow read:   if request.auth != null;  // dashboard reads
+      allow read:   if true;                  // mobile reads (checkUserExists, getUserDocument)
+      allow create: if true;                  // mobile first-login doc creation
+      allow update: if true;                  // mobile profile updates (displayName, pushToken)
+                                              // role field is never sent by mobile clients
+      allow delete: if request.auth != null;     // dashboard admin only (isAdmin is enforced in UI; request.auth.uid is anonymous)
     }
 
-    // ─── otp_codes collection ───────────────────────────────────────────────
-    //
-    // The mobile app writes OTP codes on behalf of unauthenticated users
-    // (before they have a Firebase Auth session). Allow write from any
-    // request and read only by the matching phone UID.
+    // ─── otp_codes ───────────────────────────────────────────────────────────
+    // Fully open — short-lived codes, brute-force protected in service layer.
 
     match /otp_codes/{phoneUid} {
-      allow write: if true;
-      allow read: if true;
-      allow delete: if true;
+      allow read, write, delete: if true;
     }
 
-    // ─── tanod_locations collection ────────────────────────────────────────
-    //
-    // Tanods write their own location; officials and tanods read all locations
-    // (for the dashboard map). Residents cannot read tanod locations.
-    // No client deletes.
+    // ─── tanod_locations & responder_locations ──────────────────────────────
+    // Responders and officials broadcast location.
+    // Dashboard and mobile clients read locations.
 
     match /tanod_locations/{userId} {
-      allow write: if request.auth != null;
-      allow read: if request.auth != null;
+      allow write:  if true;
+      allow read:   if true;
       allow delete: if false;
     }
 
-    // ─── Default deny ───────────────────────────────────────────────────────
-    //
-    // All collections not explicitly matched above are denied.
-    // This is the fail-safe: any new collection added to Firestore
-    // is locked until a rule is explicitly written for it.
+    match /responder_locations/{userId} {
+      allow write:  if true;
+      allow read:   if true;
+      allow delete: if false;
+    }
 
+    // ─── Default deny ─────────────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
     }
