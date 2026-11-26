@@ -28,12 +28,14 @@ const AppStack = createNativeStackNavigator<AppStackParamList>();
 function AuthNavigator({ onAuthSuccess }: { onAuthSuccess: () => void }) {
   return (
     <AuthStack.Navigator screenOptions={{ headerShown: false }}>
-      <AuthStack.Screen name="PhoneEntry" component={PhoneEntryScreen} />
+      <AuthStack.Screen name="PhoneEntry">
+        {(props) => <PhoneEntryScreen {...props} onAuthSuccess={onAuthSuccess} />}
+      </AuthStack.Screen>
       <AuthStack.Screen name="OtpVerify">
         {(props) => <OtpVerifyScreen {...props} onAuthSuccess={onAuthSuccess} />}
       </AuthStack.Screen>
       <AuthStack.Screen name="DisplayNameSetup">
-        {() => <DisplayNameSetupScreen onAuthSuccess={onAuthSuccess} />}
+        {(props) => <DisplayNameSetupScreen {...props} onAuthSuccess={onAuthSuccess} />}
       </AuthStack.Screen>
     </AuthStack.Navigator>
   );

@@ -28,6 +28,7 @@ import {
 } from 'firebase/firestore';
 import { db, ensureAnonymousAuth } from './firebase';
 import { generateAndSendOtp, verifyOtp } from './otpService';
+import { hashPassword, verifyPassword } from '../utils/passwordUtils';
 import { UserDocument, UserRole } from '../types';
 
 const SESSION_KEY = 'emergo_user_uid';
@@ -92,7 +93,81 @@ export async function confirmOtp(
   return { uid, ...snap.data() } as UserDocument;
 }
 
-// ─── Profile ──────────────────────────────────────────────────────────────────
+// ─── Password Login & Profile ─────────────────────────────────────────────────
+
+export async function signInWithPhonePassword(
+  phoneNumber: string,
+  password: string
+): Promise<UserDocument> {
+  await ensureAnonymousAuth();
+  const phoneUid = phoneNumber.replace(/\+/g, '').replace(/\s/g, '');
+
+  let uid = phoneUid;
+  let userRef = doc(db, 'users', uid);
+  let userSnap = await getDoc(userRef);
+
+  if (!userSnap.exists()) {
+    const q = query(
+      collection(db, 'users'),
+      where('phoneNumber', '==', phoneNumber),
+      limit(1)
+    );
+    const qSnap = await getDocs(q);
+    if (!qSnap.empty) {
+      uid = qSnap.docs[0].id;
+      userRef = doc(db, 'users', uid);
+      userSnap = qSnap.docs[0];
+    }
+  }
+
+  if (!userSnap.exists()) {
+    throw new Error('No account found for this number. Please register first.');
+  }
+
+  const userData = userSnap.data();
+  if (!userData.passwordHash || !userData.passwordSalt) {
+    if (userData.role === 'resident') {
+      throw new Error('No password set for this account. Tap "Forgot password?" to set one via SMS.');
+    }
+    throw new Error('Account has no password set. Ask an official or admin to reset it.');
+  }
+
+  const valid = await verifyPassword(password, userData.passwordHash, userData.passwordSalt);
+  if (!valid) {
+    throw new Error('Incorrect phone number or password.');
+  }
+
+  await AsyncStorage.setItem(SESSION_KEY, uid);
+  return { uid, ...userData } as UserDocument;
+}
+
+export async function saveProfileAndPassword(
+  uid: string,
+  displayName: string,
+  password: string
+): Promise<void> {
+  await ensureAnonymousAuth();
+  const { hash, salt } = await hashPassword(password);
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    displayName: displayName.trim(),
+    passwordHash: hash,
+    passwordSalt: salt,
+  });
+}
+
+export async function resetPassword(
+  uid: string,
+  password: string
+): Promise<void> {
+  await ensureAnonymousAuth();
+  const { hash, salt } = await hashPassword(password);
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    passwordHash: hash,
+    passwordSalt: salt,
+  });
+}
 
 export async function saveDisplayName(
   uid: string,
@@ -101,6 +176,18 @@ export async function saveDisplayName(
   await ensureAnonymousAuth();
   const userRef = doc(db, 'users', uid);
   await updateDoc(userRef, { displayName: displayName.trim() });
+}
+
+export async function getUserRoleByPhone(phoneNumber: string): Promise<UserRole | null> {
+  await ensureAnonymousAuth();
+  const phoneUid = phoneNumber.replace(/\+/g, '').replace(/\s/g, '');
+  const snap = await getDoc(doc(db, 'users', phoneUid));
+  if (snap.exists()) return (snap.data().role as UserRole) ?? null;
+
+  const q = query(collection(db, 'users'), where('phoneNumber', '==', phoneNumber), limit(1));
+  const qSnap = await getDocs(q);
+  if (!qSnap.empty) return (qSnap.docs[0].data().role as UserRole) ?? null;
+  return null;
 }
 
 export async function getUserDocument(uid: string): Promise<UserDocument | null> {

@@ -86,8 +86,10 @@ export default function OtpVerifyScreen({ navigation, route, onAuthSuccess }: Pr
     setLoading(true);
     try {
       const userDoc = await confirmOtp(phoneNumber, otp);
-      if (!userDoc.displayName) {
-        navigation.navigate('DisplayNameSetup');
+      if (mode === 'reset') {
+        navigation.navigate('DisplayNameSetup', { mode: 'reset' });
+      } else if (!userDoc.displayName || !userDoc.passwordHash) {
+        navigation.navigate('DisplayNameSetup', { mode: 'register' });
       } else {
         onAuthSuccess();
       }

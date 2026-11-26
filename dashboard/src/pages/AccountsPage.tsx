@@ -82,13 +82,20 @@ export default function AccountsPage() {
         toast.error('Enter a valid PH mobile number for the responder (e.g. +639171234567 or 09171234567).');
         return;
       }
+      if (!form.password.trim() || form.password.length < 6) {
+        toast.error('Password (min. 6 characters) is required for mobile app login.');
+        return;
+      }
       setSaving(true);
       try {
         const uid = normalizedPhone.replace(/\+/g, '');
+        const { hash: passwordHash, salt: passwordSalt } = await hashPassword(form.password);
         await setDoc(doc(db, 'users', uid), {
           role: 'responder',
           displayName: form.displayName.trim(),
           phoneNumber: normalizedPhone,
+          passwordHash,
+          passwordSalt,
           createdAt: serverTimestamp(),
         });
         toast.success(`Responder "${form.displayName.trim()}" registered for mobile login.`);
@@ -239,7 +246,7 @@ export default function AccountsPage() {
                       <td className="px-4 py-3 text-gray-500">{u.phoneNumber || '—'}</td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
-                          {isAdmin && u.role !== 'responder' && u.role !== 'tanod' && (
+                          {(isAdmin || u.role === 'responder' || u.role === 'tanod') && (
                             <button
                               onClick={() => { setResetUid(u.uid); setNewPassword(''); }}
                               className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded-lg"
@@ -302,21 +309,35 @@ export default function AccountsPage() {
                 />
               </div>
               {form.role === 'responder' ? (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Mobile Phone Number <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.phoneNumber}
-                    onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
-                    placeholder="09171234567 or +639171234567"
-                    className="w-full border border-gray-300 rounded-lg px-3 h-10 text-sm outline-none focus:border-red-400"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Responders sign in on the Emergo mobile app using this number + SMS OTP.
-                  </p>
-                </div>
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Mobile Phone Number <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={form.phoneNumber}
+                      onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
+                      placeholder="09171234567 or +639171234567"
+                      className="w-full border border-gray-300 rounded-lg px-3 h-10 text-sm outline-none focus:border-red-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Password <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      placeholder="Min. 6 characters"
+                      className="w-full border border-gray-300 rounded-lg px-3 h-10 text-sm outline-none focus:border-red-400"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Responders sign in on the Emergo mobile app using this phone number + password.
+                    </p>
+                  </div>
+                </>
               ) : (
                 <>
                   <div>

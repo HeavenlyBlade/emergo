@@ -32,7 +32,8 @@ export interface UserDocument {
   createdAt: Timestamp;
   expoPushToken?: string;    // stored on login for officials/tanods; used for fan-out
   username?: string;         // dashboard login (officials/tanods only)
-  passwordHash?: string;     // SHA-256 hex, set by admin
+  passwordHash?: string;     // PBKDF2-SHA256 hex
+  passwordSalt?: string;     // 16-byte hex salt
 }
 
 /**
@@ -79,8 +80,8 @@ export interface ResponderLocation {
  */
 export type AuthStackParamList = {
   PhoneEntry: undefined;
-  OtpVerify: { phoneNumber: string; mode: 'register' | 'signin' };
-  DisplayNameSetup: undefined;
+  OtpVerify: { phoneNumber: string; mode: 'register' | 'reset' };
+  DisplayNameSetup: { mode?: 'register' | 'reset' } | undefined;
 };
 
 /**
