@@ -80,7 +80,7 @@ export default function AlertScreen() {
           if (inc.status === 'verified' && prevStatus && prevStatus !== 'verified') {
             Notifications.scheduleNotificationAsync({
               content: {
-                title: '✅ Emergency Alert Verified',
+                title: 'Emergency Alert Verified',
                 body:
                   inc.adminMessage ||
                   'Your emergency has been received and verified. You have been heard and responders will arrive shortly.',
@@ -222,7 +222,7 @@ export default function AlertScreen() {
                 photoBase64 ?? undefined
               );
               Alert.alert(
-                'Alert Sent ✅',
+                'Alert Sent',
                 'Your emergency alert has been sent. Barangay officials have been notified.'
               );
               setDescription('');
@@ -255,7 +255,7 @@ export default function AlertScreen() {
           activeOpacity={0.75}
           accessibilityLabel="Verification Notifications"
         >
-          <Text style={styles.notifBellIcon}>🔔</Text>
+          <Text style={styles.notifBellIcon}>Notifications</Text>
           {unreadCount > 0 && (
             <View style={styles.notifBadge}>
               <Text style={styles.notifBadgeText}>
@@ -284,9 +284,21 @@ export default function AlertScreen() {
           activeOpacity={responderCount > 0 ? 0.75 : 1}
         >
           <View style={styles.chipInnerRow}>
-            <Text style={styles.chipEmoji}>
-              {responderCount > 0 ? '🚨' : activeIncident?.status === 'verified' ? '🛡️' : activeIncident ? '⏳' : '📡'}
-            </Text>
+            <View
+              style={[
+                styles.chipDot,
+                {
+                  backgroundColor:
+                    responderCount > 0
+                      ? '#DC2626'
+                      : activeIncident?.status === 'verified'
+                      ? '#10B981'
+                      : activeIncident
+                      ? '#F59E0B'
+                      : '#6B7280',
+                },
+              ]}
+            />
             <Text
               style={[
                 styles.chipText,
@@ -326,7 +338,7 @@ export default function AlertScreen() {
                 : null;
               return (
                 <View key={r.uid} style={styles.responderRow}>
-                  <Text style={styles.responderName}>👤 {r.displayName}</Text>
+                  <Text style={styles.responderName}>{r.displayName}</Text>
                   <Text style={styles.responderDistance}>
                     {dist !== null ? `${formatDistance(dist)} away` : 'On the way'}
                   </Text>
@@ -369,7 +381,7 @@ export default function AlertScreen() {
 
       {/* GPS Coordinates Card */}
       <View style={styles.locationCard}>
-        <Text style={styles.locationLabel}>📍 Your Location</Text>
+        <Text style={styles.locationLabel}>Your Location</Text>
         {locationLoading ? (
           <Text style={styles.locationValue}>Getting your location...</Text>
         ) : locationError ? (
@@ -456,7 +468,6 @@ export default function AlertScreen() {
           onPress={handleAddPhoto}
           activeOpacity={0.7}
         >
-          <Text style={styles.photoButtonIcon}>📷</Text>
           <Text style={styles.photoButtonText}>Add Photo (optional)</Text>
         </TouchableOpacity>
       )}
@@ -464,7 +475,7 @@ export default function AlertScreen() {
       {/* Warning box */}
       <View style={styles.warningBox}>
         <Text style={styles.warningText}>
-          ⚠️ Only use for real emergencies. False alerts are a violation of barangay rules.
+          Warning: Only use for real emergencies. False alerts are a violation of barangay rules.
         </Text>
       </View>
 
@@ -560,7 +571,7 @@ export default function AlertScreen() {
                 verifiedIncidents.map((inc) => (
                   <View key={inc.id} style={styles.notifItem}>
                     <View style={styles.notifItemTop}>
-                      <Text style={styles.notifItemStatus}>✅ Alert Verified</Text>
+                      <Text style={styles.notifItemStatus}>Alert Verified</Text>
                       <Text style={styles.notifItemTime}>
                         {formatRelativeTime((inc.verifiedAt ?? inc.reportedAt) as Timestamp)}
                       </Text>
@@ -821,8 +832,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  chipEmoji: {
-    fontSize: 16,
+  chipDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   chipText: {
     fontSize: 13,
@@ -937,9 +950,9 @@ const styles = StyleSheet.create({
   },
   notifBellBtn: {
     position: 'relative',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
@@ -947,7 +960,9 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   notifBellIcon: {
-    fontSize: 19,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#374151',
   },
   notifBadge: {
     position: 'absolute',

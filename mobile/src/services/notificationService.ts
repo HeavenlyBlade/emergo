@@ -106,7 +106,7 @@ export async function notifyOfficialsAndTanods(
   const messages = tokens.map((token) => ({
     to: token,
     sound: 'default',
-    title: '🚨 Emergency Alert',
+    title: 'Emergency Alert',
     body: `${reporterName} has sent an emergency alert. Tap to view location.`,
     data: {
       incidentId,

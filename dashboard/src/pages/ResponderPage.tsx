@@ -215,7 +215,7 @@ export default function ResponderPage() {
       );
 
       if (nextStatus) {
-        toast.success('🚨 Marked as ON THE WAY! Residents and Admin notified.');
+        toast.success('Marked as ON THE WAY! Residents and Admin notified.');
       } else {
         toast.success('Status updated: No longer marked on the way.');
       }
@@ -592,12 +592,12 @@ export default function ResponderPage() {
                     {isCurrentlyOnTheWay(selected) ? (
                       <>
                         <CheckCircle2 size={18} />
-                        <span>✓ You Are On The Way (Tap to Arrive / Cancel)</span>
+                        <span>You Are On The Way (Tap to Arrive / Cancel)</span>
                       </>
                     ) : (
                       <>
                         <Radio size={18} />
-                        <span>🚨 On the way</span>
+                        <span>On the way</span>
                       </>
                     )}
                   </button>

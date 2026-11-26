@@ -102,7 +102,7 @@ export default function TanodScreen() {
         !isOnTheWay
       );
       Alert.alert(
-        !isOnTheWay ? 'Status: On The Way 🚨' : 'Status Updated',
+        !isOnTheWay ? 'Status: On The Way' : 'Status Updated',
         !isOnTheWay
           ? 'You are marked as On The Way! Location shared with resident.'
           : 'You are no longer marked on the way.'
@@ -228,8 +228,8 @@ export default function TanodScreen() {
                 item.respondersOnTheWay?.some((r) => r.uid === uid) && styles.onTheWayBtnTextActive,
               ]}>
                 {item.respondersOnTheWay?.some((r) => r.uid === uid)
-                  ? '✓ You are On The Way (Tap to Cancel)'
-                  : '🚨 On The Way'}
+                  ? 'You are On The Way (Tap to Cancel)'
+                  : 'On The Way'}
               </Text>
             </TouchableOpacity>
 
@@ -267,7 +267,7 @@ export default function TanodScreen() {
             onPress={() => setBroadcastEnabled(!broadcastEnabled)}
           >
             <Text style={[styles.toggleBtnText, broadcastEnabled ? styles.toggleBtnTextActive : styles.toggleBtnTextInactive]}>
-              {broadcastEnabled ? '📍 Visible' : '⚪ Hidden'}
+              {broadcastEnabled ? 'Location: Visible' : 'Location: Hidden'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleSignOut}>

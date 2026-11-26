@@ -364,7 +364,7 @@ export default function MapPage() {
                           </div>
                           <p className="font-bold text-gray-800">{tanod.displayName}</p>
                           <p className="text-xs text-gray-500 capitalize">
-                            Status: <span className="font-medium text-gray-700">{isOnTheWay ? '🚨 On the way' : '🟢 Available'}</span>
+                            Status: <span className="font-medium text-gray-700">{isOnTheWay ? 'On the way' : 'Available'}</span>
                           </p>
                           {dist !== null && (
                             <p className="text-xs font-semibold text-blue-700 mt-1">

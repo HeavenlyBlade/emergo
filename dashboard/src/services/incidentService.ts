@@ -45,7 +45,7 @@ async function notifyResidentVerified(reportedBy: string, incidentId: string, me
       body: JSON.stringify({
         to: token,
         sound: 'default',
-        title: '✅ Emergency Alert Verified',
+        title: 'Emergency Alert Verified',
         body: message,
         data: { incidentId, type: 'verified' },
         priority: 'high',
