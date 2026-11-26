@@ -69,7 +69,7 @@ export default function AccountsPage() {
   // ─── Create account ────────────────────────────────────────────────────────
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const effectiveRole = isAdmin ? form.role : 'responder';
+    const effectiveRole = form.role;
 
     if (!form.displayName.trim()) {
       toast.error('Display name is required.');
@@ -282,13 +282,12 @@ export default function AccountsPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
                 <select
-                  value={isAdmin ? form.role : 'responder'}
-                  disabled={!isAdmin}
+                  value={form.role}
                   onChange={(e) => setForm({ ...form, role: e.target.value as 'official' | 'admin' | 'responder' })}
-                  className="w-full border border-gray-300 rounded-lg px-3 h-10 text-sm outline-none focus:border-red-400 disabled:bg-gray-100"
+                  className="w-full border border-gray-300 rounded-lg px-3 h-10 text-sm outline-none focus:border-red-400"
                 >
                   <option value="responder">Responder (Mobile App)</option>
-                  {isAdmin && <option value="official">Official (Dashboard)</option>}
+                  <option value="official">Official (Dashboard)</option>
                   {isAdmin && <option value="admin">Admin (Dashboard)</option>}
                 </select>
               </div>
@@ -302,7 +301,7 @@ export default function AccountsPage() {
                   className="w-full border border-gray-300 rounded-lg px-3 h-10 text-sm outline-none focus:border-red-400"
                 />
               </div>
-              {(isAdmin ? form.role : 'responder') === 'responder' ? (
+              {form.role === 'responder' ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Mobile Phone Number <span className="text-red-600">*</span>
