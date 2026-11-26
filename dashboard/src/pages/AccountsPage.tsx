@@ -231,7 +231,7 @@ export default function AccountsPage() {
                 ) : (
                   users.map((u) => (
                     <tr key={u.uid} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono text-gray-700">{u.username || <span className="text-gray-400 italic font-sans text-xs">Mobile OTP</span>}</td>
+                      <td className="px-4 py-3 font-mono text-gray-700">{u.username || <span className="text-gray-400 italic font-sans text-xs">Mobile App</span>}</td>
                       <td className="px-4 py-3 text-gray-700">{u.displayName}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${u.role === 'admin'
