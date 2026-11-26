@@ -33,7 +33,7 @@ import * as Location from 'expo-location';
 import { useAuth } from '../hooks/useAuth';
 import { useIncidents } from '../hooks/useIncidents';
 import { signOut } from '../services/authService';
-import { startLocationBroadcast } from '../services/tanodLocationService';
+import { startLocationBroadcast, setMobileResponderVisibility } from '../services/tanodLocationService';
 import { setResponderOnTheWay } from '../services/incidentService';
 import {
   STATUS_COLORS,
@@ -65,9 +65,11 @@ export default function TanodScreen() {
 
   useEffect(() => {
     if (userDoc?.role !== 'tanod' && userDoc?.role !== 'responder') return;
-    if (!uid || !broadcastEnabled) {
+    if (!uid) return;
+    if (!broadcastEnabled) {
       locationSubRef.current?.remove();
       locationSubRef.current = null;
+      setMobileResponderVisibility(uid, false).catch(() => { });
       return;
     }
 
@@ -153,8 +155,8 @@ export default function TanodScreen() {
               item.severity === 'light'
                 ? { color: '#92400E', backgroundColor: '#FEF3C7' }
                 : item.severity === 'moderate'
-                ? { color: '#9A3412', backgroundColor: '#FFEDD5' }
-                : { color: '#991B1B', backgroundColor: '#FEE2E2' },
+                  ? { color: '#9A3412', backgroundColor: '#FFEDD5' }
+                  : { color: '#991B1B', backgroundColor: '#FEE2E2' },
             ]}>
               {item.severity.charAt(0).toUpperCase() + item.severity.slice(1)}
             </Text>
@@ -256,7 +258,7 @@ export default function TanodScreen() {
             )}
           </View>
           <Text style={styles.headerSub}>
-            Hi, {userDoc?.displayName ?? '...'} · Tanod
+            Hi, {userDoc?.displayName ?? '...'} · {userDoc?.role === 'responder' ? 'Responder' : 'Tanod'}
           </Text>
         </View>
         <View style={styles.headerRight}>

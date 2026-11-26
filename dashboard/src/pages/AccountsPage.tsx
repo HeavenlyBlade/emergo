@@ -25,10 +25,19 @@ interface DashboardUser {
   createdAt?: { toDate: () => Date };
 }
 
-const EMPTY_FORM = { username: '', password: '', displayName: '', phoneNumber: '', role: 'official' as 'official' | 'admin' | 'responder' };
+const EMPTY_FORM = { username: '', password: '', displayName: '', phoneNumber: '', role: 'responder' as 'official' | 'admin' | 'responder' };
+
+function normalizePhPhone(raw: string): string | null {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 10 && digits.startsWith('9')) return `+63${digits}`;
+  if (digits.length === 11 && digits.startsWith('09')) return `+63${digits.slice(1)}`;
+  if (digits.length === 12 && digits.startsWith('639')) return `+${digits}`;
+  return null;
+}
 
 export default function AccountsPage() {
   const { userDoc } = useAuth();
+  const isAdmin = userDoc?.role === 'admin';
   const [users, setUsers] = useState<DashboardUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -45,8 +54,8 @@ export default function AccountsPage() {
       const snap = await getDocs(collection(db, 'users'));
       const list = snap.docs
         .map((d) => ({ uid: d.id, ...d.data() } as DashboardUser))
-        .filter((u) => u.role === 'official' || u.role === 'admin' || u.role === 'responder')
-        .sort((a, b) => a.username?.localeCompare(b.username ?? '') ?? 0);
+        .filter((u) => u.role === 'official' || u.role === 'admin' || u.role === 'responder' || u.role === 'tanod')
+        .sort((a, b) => (a.displayName || a.username || '').localeCompare(b.displayName || b.username || ''));
       setUsers(list);
     } catch (e: any) {
       toast.error('Failed to load accounts.');
@@ -60,8 +69,42 @@ export default function AccountsPage() {
   // ─── Create account ────────────────────────────────────────────────────────
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.username.trim() || !form.password.trim() || !form.displayName.trim()) {
-      toast.error('Username, password, and display name are required.');
+    const effectiveRole = isAdmin ? form.role : 'responder';
+
+    if (!form.displayName.trim()) {
+      toast.error('Display name is required.');
+      return;
+    }
+
+    if (effectiveRole === 'responder') {
+      const normalizedPhone = normalizePhPhone(form.phoneNumber);
+      if (!normalizedPhone) {
+        toast.error('Enter a valid PH mobile number for the responder (e.g. +639171234567 or 09171234567).');
+        return;
+      }
+      setSaving(true);
+      try {
+        const uid = normalizedPhone.replace(/\+/g, '');
+        await setDoc(doc(db, 'users', uid), {
+          role: 'responder',
+          displayName: form.displayName.trim(),
+          phoneNumber: normalizedPhone,
+          createdAt: serverTimestamp(),
+        });
+        toast.success(`Responder "${form.displayName.trim()}" registered for mobile login.`);
+        setForm(EMPTY_FORM);
+        setShowForm(false);
+        fetchUsers();
+      } catch (e: any) {
+        toast.error(e?.message ?? 'Could not register responder.');
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    if (!form.username.trim() || !form.password.trim()) {
+      toast.error('Username and password are required for official/admin accounts.');
       return;
     }
     setSaving(true);
@@ -69,13 +112,13 @@ export default function AccountsPage() {
       const uid = `user_${form.username.trim().toLowerCase()}`;
       const { hash: passwordHash, salt: passwordSalt } = await hashPassword(form.password);
       await setDoc(doc(db, 'users', uid), {
-        role:         form.role,
-        displayName:  form.displayName.trim(),
-        phoneNumber:  form.phoneNumber.trim() || '',
-        username:     form.username.trim().toLowerCase(),
+        role: effectiveRole,
+        displayName: form.displayName.trim(),
+        phoneNumber: form.phoneNumber.trim() || '',
+        username: form.username.trim().toLowerCase(),
         passwordHash,
         passwordSalt,
-        createdAt:    serverTimestamp(),
+        createdAt: serverTimestamp(),
       });
       toast.success(`Account "${form.username}" created.`);
       setForm(EMPTY_FORM);
@@ -181,36 +224,39 @@ export default function AccountsPage() {
                 ) : (
                   users.map((u) => (
                     <tr key={u.uid} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono text-gray-700">{u.username}</td>
+                      <td className="px-4 py-3 font-mono text-gray-700">{u.username || <span className="text-gray-400 italic font-sans text-xs">Mobile OTP</span>}</td>
                       <td className="px-4 py-3 text-gray-700">{u.displayName}</td>
                       <td className="px-4 py-3">
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                          u.role === 'admin'
-                            ? 'bg-purple-100 text-purple-800'
-                            : u.role === 'responder'
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${u.role === 'admin'
+                          ? 'bg-purple-100 text-purple-800'
+                          : u.role === 'responder' || u.role === 'tanod'
                             ? 'bg-emerald-100 text-emerald-800'
                             : 'bg-blue-100 text-blue-800'
-                        }`}>
+                          }`}>
                           {u.role}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-gray-500">{u.phoneNumber || '—'}</td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
-                          <button
-                            onClick={() => { setResetUid(u.uid); setNewPassword(''); }}
-                            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded-lg"
-                            title="Reset password"
-                          >
-                            <KeyRound size={13} /> Reset
-                          </button>
-                          <button
-                            onClick={() => handleDelete(u.uid, u.username)}
-                            className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-1 rounded-lg"
-                            title="Delete account"
-                          >
-                            <Trash2 size={13} /> Delete
-                          </button>
+                          {isAdmin && u.role !== 'responder' && u.role !== 'tanod' && (
+                            <button
+                              onClick={() => { setResetUid(u.uid); setNewPassword(''); }}
+                              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded-lg"
+                              title="Reset password"
+                            >
+                              <KeyRound size={13} /> Reset
+                            </button>
+                          )}
+                          {(isAdmin || u.role === 'responder' || u.role === 'tanod') && (
+                            <button
+                              onClick={() => handleDelete(u.uid, u.username || u.displayName)}
+                              className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-1 rounded-lg"
+                              title="Delete account"
+                            >
+                              <Trash2 size={13} /> Delete
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -234,14 +280,17 @@ export default function AccountsPage() {
             </div>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                <input
-                  type="text"
-                  value={form.username}
-                  onChange={(e) => setForm({ ...form, username: e.target.value })}
-                  placeholder="e.g. brgy_captain"
-                  className="w-full border border-gray-300 rounded-lg px-3 h-10 text-sm outline-none focus:border-red-400"
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <select
+                  value={isAdmin ? form.role : 'responder'}
+                  disabled={!isAdmin}
+                  onChange={(e) => setForm({ ...form, role: e.target.value as 'official' | 'admin' | 'responder' })}
+                  className="w-full border border-gray-300 rounded-lg px-3 h-10 text-sm outline-none focus:border-red-400 disabled:bg-gray-100"
+                >
+                  <option value="responder">Responder (Mobile App)</option>
+                  {isAdmin && <option value="official">Official (Dashboard)</option>}
+                  {isAdmin && <option value="admin">Admin (Dashboard)</option>}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
@@ -253,38 +302,56 @@ export default function AccountsPage() {
                   className="w-full border border-gray-300 rounded-lg px-3 h-10 text-sm outline-none focus:border-red-400"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                <input
-                  type="password"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  placeholder="Min. 6 characters"
-                  className="w-full border border-gray-300 rounded-lg px-3 h-10 text-sm outline-none focus:border-red-400"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone (optional)</label>
-                <input
-                  type="text"
-                  value={form.phoneNumber}
-                  onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
-                  placeholder="+639..."
-                  className="w-full border border-gray-300 rounded-lg px-3 h-10 text-sm outline-none focus:border-red-400"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                <select
-                  value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value as 'official' | 'admin' | 'responder' })}
-                  className="w-full border border-gray-300 rounded-lg px-3 h-10 text-sm outline-none focus:border-red-400"
-                >
-                  <option value="official">Official</option>
-                  <option value="admin">Admin</option>
-                  <option value="responder">Responder</option>
-                </select>
-              </div>
+              {(isAdmin ? form.role : 'responder') === 'responder' ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Mobile Phone Number <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.phoneNumber}
+                    onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
+                    placeholder="09171234567 or +639171234567"
+                    className="w-full border border-gray-300 rounded-lg px-3 h-10 text-sm outline-none focus:border-red-400"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Responders sign in on the Emergo mobile app using this number + SMS OTP.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                    <input
+                      type="text"
+                      value={form.username}
+                      onChange={(e) => setForm({ ...form, username: e.target.value })}
+                      placeholder="e.g. brgy_captain"
+                      className="w-full border border-gray-300 rounded-lg px-3 h-10 text-sm outline-none focus:border-red-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input
+                      type="password"
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      placeholder="Min. 6 characters"
+                      className="w-full border border-gray-300 rounded-lg px-3 h-10 text-sm outline-none focus:border-red-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone (optional)</label>
+                    <input
+                      type="text"
+                      value={form.phoneNumber}
+                      onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
+                      placeholder="+639..."
+                      className="w-full border border-gray-300 rounded-lg px-3 h-10 text-sm outline-none focus:border-red-400"
+                    />
+                  </div>
+                </>
+              )}
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"

@@ -21,7 +21,6 @@ import MapPage from './pages/MapPage';
 import IncidentsPage from './pages/IncidentsPage';
 import AdminPage from './pages/AdminPage';
 import AccountsPage from './pages/AccountsPage';
-import ResponderPage from './pages/ResponderPage';
 import DevLoginPage from './pages/DevLoginPage';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -39,19 +38,11 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     return <LoginPage onLogin={refresh} />;
   }
 
-  if (userDoc.role === 'resident') {
+  if (userDoc.role === 'resident' || userDoc.role === 'responder' || userDoc.role === 'tanod') {
     return <LoginPage onLogin={refresh} />;
   }
 
   return <>{children}</>;
-}
-
-function RoleBasedHome() {
-  const { userDoc } = useAuth();
-  if (userDoc?.role === 'responder') {
-    return <ResponderPage />;
-  }
-  return <MapPage />;
 }
 
 export default function App() {
@@ -66,8 +57,7 @@ export default function App() {
             element={<DevLoginPage onLogin={() => window.location.replace('/')} />}
           />
         )}
-        <Route path="/" element={<AuthGuard><RoleBasedHome /></AuthGuard>} />
-        <Route path="/responder" element={<AuthGuard><ResponderPage /></AuthGuard>} />
+        <Route path="/" element={<AuthGuard><MapPage /></AuthGuard>} />
         <Route path="/incidents" element={<AuthGuard><IncidentsPage /></AuthGuard>} />
         <Route path="/admin" element={<AuthGuard><AdminPage /></AuthGuard>} />
         <Route path="/accounts" element={<AuthGuard><AccountsPage /></AuthGuard>} />

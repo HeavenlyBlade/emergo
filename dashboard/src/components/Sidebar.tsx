@@ -3,21 +3,20 @@
  */
 
 import { Link } from 'react-router-dom';
-import { Map, List, BarChart2, Users, Radio, LogOut } from 'lucide-react';
+import { Map, List, BarChart2, Users, LogOut } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { signOut } from '../services/authService';
 import type { UserDocument } from '../types';
 
 interface Props {
-  active: 'map' | 'incidents' | 'admin' | 'accounts' | 'responder';
+  active: 'map' | 'incidents' | 'admin' | 'accounts';
   userDoc: UserDocument | null;
 }
 
 const NAV = [
-  { key: 'map',       label: 'Live Map',            icon: Map,       to: '/' },
-  { key: 'responder', label: 'Responder Map',       icon: Radio,     to: '/responder' },
-  { key: 'incidents', label: 'Incidents',           icon: List,      to: '/incidents' },
-  { key: 'admin',     label: 'Records',             icon: BarChart2, to: '/admin' },
+  { key: 'map',       label: 'Live Map',  icon: Map,       to: '/' },
+  { key: 'incidents', label: 'Incidents', icon: List,      to: '/incidents' },
+  { key: 'admin',     label: 'Records',   icon: BarChart2, to: '/admin' },
 ];
 
 export default function Sidebar({ active, userDoc }: Props) {
@@ -70,8 +69,8 @@ export default function Sidebar({ active, userDoc }: Props) {
           </Link>
         ))}
 
-        {/* Accounts — admin only */}
-        {userDoc?.role === 'admin' && (
+        {/* Accounts — admin & official */}
+        {(userDoc?.role === 'admin' || userDoc?.role === 'official') && (
           <Link
             to="/accounts"
             className={`flex items-center gap-3 px-4 py-3 mx-2 rounded-lg transition-colors ${

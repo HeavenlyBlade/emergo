@@ -9,12 +9,13 @@
  * - Recent alerts list
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
   Linking,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -23,7 +24,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import * as Notifications from 'expo-notifications';
 import { Timestamp } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 import { useLocation } from '../hooks/useLocation';
@@ -56,12 +59,60 @@ export default function AlertScreen() {
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [chipExpanded, setChipExpanded] = useState(false);
+  const [notifModalVisible, setNotifModalVisible] = useState(false);
+  const [readNotifIds, setReadNotifIds] = useState<string[]>([]);
+  const prevStatusMapRef = useRef<Record<string, string>>({});
+  const initialLoadDoneRef = useRef(false);
 
   useEffect(() => {
     if (!uid) return;
-    const unsub = subscribeToMyIncidents(uid, setIncidents);
+    AsyncStorage.getItem(`emergo_read_verifs_${uid}`)
+      .then((raw) => {
+        if (raw) setReadNotifIds(JSON.parse(raw));
+      })
+      .catch(() => {});
+
+    const unsub = subscribeToMyIncidents(uid, (list) => {
+      // Detect real-time unverified -> verified transitions and fire a local phone notification
+      if (initialLoadDoneRef.current) {
+        for (const inc of list) {
+          const prevStatus = prevStatusMapRef.current[inc.id];
+          if (inc.status === 'verified' && prevStatus && prevStatus !== 'verified') {
+            Notifications.scheduleNotificationAsync({
+              content: {
+                title: '✅ Emergency Alert Verified',
+                body:
+                  inc.adminMessage ||
+                  'Your emergency has been received and verified. You have been heard and responders will arrive shortly.',
+                sound: 'default',
+              },
+              trigger: null,
+            }).catch(() => {});
+          }
+        }
+      }
+      const nextMap: Record<string, string> = {};
+      for (const inc of list) nextMap[inc.id] = inc.status;
+      prevStatusMapRef.current = nextMap;
+      initialLoadDoneRef.current = true;
+      setIncidents(list);
+    });
     return () => unsub();
   }, [uid]);
+
+  const verifiedIncidents = incidents.filter(
+    (i) => i.status === 'verified' || !!i.verifiedAt || !!i.adminMessage
+  );
+  const unreadCount = verifiedIncidents.filter((i) => !readNotifIds.includes(i.id)).length;
+
+  const handleOpenNotifications = () => {
+    setNotifModalVisible(true);
+    if (uid && verifiedIncidents.length > 0) {
+      const allIds = Array.from(new Set([...readNotifIds, ...verifiedIncidents.map((i) => i.id)]));
+      setReadNotifIds(allIds);
+      AsyncStorage.setItem(`emergo_read_verifs_${uid}`, JSON.stringify(allIds)).catch(() => {});
+    }
+  };
 
   // Active / most recent alert
   const activeIncident = incidents.find((i) => i.status !== 'resolved') ?? incidents[0];
@@ -195,6 +246,26 @@ export default function AlertScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {/* Top Bar with Upper-Right Verification Notification Bell */}
+      <View style={styles.topUtilityBar}>
+        <Text style={styles.topBrand}>Emergo</Text>
+        <TouchableOpacity
+          style={styles.notifBellBtn}
+          onPress={handleOpenNotifications}
+          activeOpacity={0.75}
+          accessibilityLabel="Verification Notifications"
+        >
+          <Text style={styles.notifBellIcon}>🔔</Text>
+          {unreadCount > 0 && (
+            <View style={styles.notifBadge}>
+              <Text style={styles.notifBadgeText}>
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
       {/* Center Upper Section: Responder Indicator Chip & Admin Message */}
       <View style={styles.upperCenterSection}>
         {/* Responder Chip */}
@@ -460,6 +531,56 @@ export default function AlertScreen() {
           ))}
         </View>
       )}
+
+      {/* Verification Notifications Modal */}
+      <Modal
+        visible={notifModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setNotifModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Verification Notifications</Text>
+              <TouchableOpacity
+                onPress={() => setNotifModalVisible(false)}
+                style={styles.modalCloseBtn}
+              >
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody} contentContainerStyle={{ gap: 10 }}>
+              {verifiedIncidents.length === 0 ? (
+                <Text style={styles.modalEmpty}>
+                  No verified alert notifications yet. When a barangay official verifies your alert, it will appear here.
+                </Text>
+              ) : (
+                verifiedIncidents.map((inc) => (
+                  <View key={inc.id} style={styles.notifItem}>
+                    <View style={styles.notifItemTop}>
+                      <Text style={styles.notifItemStatus}>✅ Alert Verified</Text>
+                      <Text style={styles.notifItemTime}>
+                        {formatRelativeTime((inc.verifiedAt ?? inc.reportedAt) as Timestamp)}
+                      </Text>
+                    </View>
+                    <Text style={styles.notifItemMsg}>
+                      {inc.adminMessage ||
+                        'Your emergency alert has been received and verified by barangay officials. Responders will arrive shortly.'}
+                    </Text>
+                    {inc.description ? (
+                      <Text style={styles.notifItemDesc} numberOfLines={2}>
+                        Alert: {inc.description}
+                      </Text>
+                    ) : null}
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -799,5 +920,126 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1E3A8A',
     lineHeight: 18,
+  },
+
+  /* Upper-Right Verification Notification Bell & Modal */
+  topUtilityBar: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  topBrand: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#D32F2F',
+    letterSpacing: 0.5,
+  },
+  notifBellBtn: {
+    position: 'relative',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  notifBellIcon: {
+    fontSize: 19,
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#fff',
+  },
+  notifBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '75%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  modalCloseBtn: {
+    padding: 6,
+  },
+  modalCloseText: {
+    fontSize: 18,
+    color: '#6B7280',
+    fontWeight: '700',
+  },
+  modalBody: {
+    width: '100%',
+  },
+  modalEmpty: {
+    fontSize: 13,
+    color: '#6B7280',
+    textAlign: 'center',
+    paddingVertical: 24,
+    lineHeight: 20,
+  },
+  notifItem: {
+    backgroundColor: '#ECFDF5',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    padding: 12,
+    gap: 4,
+  },
+  notifItemTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  notifItemStatus: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#065F46',
+  },
+  notifItemTime: {
+    fontSize: 11,
+    color: '#047857',
+  },
+  notifItemMsg: {
+    fontSize: 13,
+    color: '#064E3B',
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  notifItemDesc: {
+    fontSize: 11,
+    color: '#4B5563',
+    marginTop: 2,
   },
 });

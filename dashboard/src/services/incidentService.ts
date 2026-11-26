@@ -30,6 +30,32 @@ async function assertOfficial(uid: string): Promise<void> {
   }
 }
 
+async function notifyResidentVerified(reportedBy: string, incidentId: string, message: string): Promise<void> {
+  try {
+    const userSnap = await getDoc(doc(db, 'users', reportedBy));
+    const token = userSnap.exists() ? userSnap.data().expoPushToken : null;
+    if (!token || typeof token !== 'string' || !token.startsWith('ExponentPushToken')) return;
+
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: token,
+        sound: 'default',
+        title: '✅ Emergency Alert Verified',
+        body: message,
+        data: { incidentId, type: 'verified' },
+        priority: 'high',
+      }),
+    });
+  } catch (err) {
+    console.warn('[incidentService] Resident push notification skipped:', err);
+  }
+}
+
 export async function sendAdminMessage(
   incidentId: string,
   officialUid: string,
@@ -37,10 +63,14 @@ export async function sendAdminMessage(
 ): Promise<void> {
   await assertOfficial(officialUid);
   const incidentRef = doc(db, 'incidents', incidentId);
+  const snap = await getDoc(incidentRef);
   await updateDoc(incidentRef, {
     adminMessage: message,
     adminMessageSentAt: serverTimestamp(),
   });
+  if (snap.exists() && snap.data().reportedBy) {
+    notifyResidentVerified(snap.data().reportedBy, incidentId, message).catch(() => {});
+  }
 }
 
 export async function verifyIncident(
@@ -51,11 +81,14 @@ export async function verifyIncident(
   await assertOfficial(officialUid);
 
   const incidentRef = doc(db, 'incidents', incidentId);
+  let reportedBy: string | undefined;
+
   await runTransaction(db, async (transaction) => {
     const snap = await transaction.get(incidentRef);
     if (!snap.exists()) throw new Error('Incident not found.');
 
     const current = snap.data();
+    reportedBy = current.reportedBy;
     if (current.status !== 'unverified') {
       throw new Error(
         current.status === 'verified'
@@ -77,6 +110,14 @@ export async function verifyIncident(
 
     transaction.update(incidentRef, updates);
   });
+
+  if (reportedBy) {
+    notifyResidentVerified(
+      reportedBy,
+      incidentId,
+      initialMessage || DEFAULT_ADMIN_MESSAGE
+    ).catch(() => {});
+  }
 }
 
 export async function resolveIncident(

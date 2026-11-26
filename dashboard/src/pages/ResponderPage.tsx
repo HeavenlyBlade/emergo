@@ -247,7 +247,7 @@ export default function ResponderPage() {
 
   return (
     <div className="flex h-screen bg-gray-100">
-      <Sidebar active="responder" userDoc={userDoc} />
+      <Sidebar active="map" userDoc={userDoc} />
 
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Header Bar */}

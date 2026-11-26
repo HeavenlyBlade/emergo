@@ -137,9 +137,9 @@ export async function signInWithCredentials(
   const userSnap = snap.docs[0];
   const userData = userSnap.data();
 
-  if (userData.role === 'resident') {
+  if (userData.role === 'resident' || userData.role === 'responder' || userData.role === 'tanod') {
     await firebaseSignOut(auth);
-    throw new Error('This dashboard is for officials only.');
+    throw new Error('This dashboard is for officials and admins only. Responders and residents use the mobile app.');
   }
 
   const storedSalt: string | undefined = userData.passwordSalt;

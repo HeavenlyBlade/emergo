@@ -147,13 +147,13 @@ export async function checkUserExists(phoneNumber: string): Promise<boolean> {
 
 /**
  * Called after user doc loads in useAuth.
- * Registers push token for officials, tanods, and responders only.
+ * Registers push token for residents, officials, tanods, and responders.
  */
 export async function registerPushTokenIfNeeded(
   uid: string,
   role: string
 ): Promise<void> {
-  if (role === 'official' || role === 'tanod' || role === 'responder') {
+  if (role === 'resident' || role === 'official' || role === 'tanod' || role === 'responder') {
     const { registerPushToken } = await import('./notificationService');
     await registerPushToken(uid);
   }
