@@ -30,30 +30,18 @@ async function assertOfficial(uid: string): Promise<void> {
   }
 }
 
-async function notifyResidentVerified(reportedBy: string, incidentId: string, message: string): Promise<void> {
-  try {
-    const userSnap = await getDoc(doc(db, 'users', reportedBy));
-    const token = userSnap.exists() ? userSnap.data().expoPushToken : null;
-    if (!token || typeof token !== 'string' || !token.startsWith('ExponentPushToken')) return;
-
-    await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        to: token,
-        sound: 'default',
-        title: 'Emergency Alert Verified',
-        body: message,
-        data: { incidentId, type: 'verified' },
-        priority: 'high',
-      }),
-    });
-  } catch (err) {
-    console.warn('[incidentService] Resident push notification skipped:', err);
-  }
+async function notifyResidentVerified(_reportedBy: string, _incidentId: string, _message: string): Promise<void> {
+  // NOTE: Expo Push API (exp.host) is a server-to-server API and blocks
+  // browser fetch requests with CORS. Resident notifications are delivered
+  // via the mobile app's real-time Firestore subscription to their own
+  // incidents (subscribeToMyIncidents in AlertScreen). The status update
+  // written by verifyIncident below triggers that listener, which schedules
+  // a local device notification — no server-to-server call needed here.
+  //
+  // The expoPushToken stored on the user document is used by the mobile app
+  // only (official/tanod fan-out runs from the resident's device, not the dashboard).
+  //
+  // If you later add a backend proxy or Cloud Function, re-enable the fetch here.
 }
 
 export async function sendAdminMessage(

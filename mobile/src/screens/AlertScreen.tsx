@@ -64,33 +64,94 @@ export default function AlertScreen() {
   const prevStatusMapRef = useRef<Record<string, string>>({});
   const initialLoadDoneRef = useRef(false);
 
+  // ─── Request notification permission on mount ────────────────────────────
+  useEffect(() => {
+    Notifications.getPermissionsAsync().then(({ status }) => {
+      if (status !== 'granted') {
+        Notifications.requestPermissionsAsync().catch(() => {});
+      }
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (!uid) return;
+
+    // Load which incidents we've already shown a notification for (separate from "read" bell)
+    const NOTIFIED_KEY = `emergo_notified_verifs_${uid}`;
+
     AsyncStorage.getItem(`emergo_read_verifs_${uid}`)
       .then((raw) => {
         if (raw) setReadNotifIds(JSON.parse(raw));
       })
       .catch(() => {});
 
-    const unsub = subscribeToMyIncidents(uid, (list) => {
-      // Detect real-time unverified -> verified transitions and fire a local phone notification
+    const unsub = subscribeToMyIncidents(uid, async (list) => {
+      // ── Cold-start check: fire notifications for verified incidents
+      //    that happened while the app was closed / in background.
+      //    We track which incident IDs we've already notified about in
+      //    AsyncStorage so we don't double-notify on subsequent snapshots.
+      if (!initialLoadDoneRef.current) {
+        try {
+          const raw = await AsyncStorage.getItem(NOTIFIED_KEY);
+          const alreadyNotified: string[] = raw ? JSON.parse(raw) : [];
+          const newlyNotified: string[] = [];
+
+          for (const inc of list) {
+            if (inc.status === 'verified' && !alreadyNotified.includes(inc.id)) {
+              newlyNotified.push(inc.id);
+              Notifications.scheduleNotificationAsync({
+                content: {
+                  title: 'Emergency Alert Verified',
+                  body:
+                    inc.adminMessage ||
+                    'Your emergency has been received and verified. Responders will arrive shortly.',
+                  sound: 'default',
+                  data: { incidentId: inc.id, type: 'verified' },
+                },
+                trigger: null,
+              }).catch(() => {});
+            }
+          }
+
+          if (newlyNotified.length > 0) {
+            const updated = [...alreadyNotified, ...newlyNotified];
+            AsyncStorage.setItem(NOTIFIED_KEY, JSON.stringify(updated)).catch(() => {});
+          }
+        } catch {
+          // ignore storage errors
+        }
+      }
+
+      // ── Foreground check: detect live status transitions (app open)
       if (initialLoadDoneRef.current) {
+        const rawNotified = await AsyncStorage.getItem(NOTIFIED_KEY).catch(() => null);
+        const alreadyNotified: string[] = rawNotified ? JSON.parse(rawNotified) : [];
+
         for (const inc of list) {
           const prevStatus = prevStatusMapRef.current[inc.id];
-          if (inc.status === 'verified' && prevStatus && prevStatus !== 'verified') {
+          if (
+            inc.status === 'verified' &&
+            prevStatus &&
+            prevStatus !== 'verified' &&
+            !alreadyNotified.includes(inc.id)
+          ) {
             Notifications.scheduleNotificationAsync({
               content: {
                 title: 'Emergency Alert Verified',
                 body:
                   inc.adminMessage ||
-                  'Your emergency has been received and verified. You have been heard and responders will arrive shortly.',
+                  'Your emergency has been received and verified. Responders will arrive shortly.',
                 sound: 'default',
+                data: { incidentId: inc.id, type: 'verified' },
               },
               trigger: null,
             }).catch(() => {});
+            alreadyNotified.push(inc.id);
+            AsyncStorage.setItem(NOTIFIED_KEY, JSON.stringify(alreadyNotified)).catch(() => {});
           }
         }
       }
+
       const nextMap: Record<string, string> = {};
       for (const inc of list) nextMap[inc.id] = inc.status;
       prevStatusMapRef.current = nextMap;
