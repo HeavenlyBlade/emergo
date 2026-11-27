@@ -18,6 +18,7 @@ import OtpVerifyScreen from '../screens/OtpVerifyScreen';
 import DisplayNameSetupScreen from '../screens/DisplayNameSetupScreen';
 import HomeScreen from '../screens/HomeScreen';
 import AlertScreen from '../screens/AlertScreen';
+import ResponderLocationsScreen from '../screens/ResponderLocationsScreen';
 import OfficialScreen from '../screens/OfficialScreen';
 import TanodScreen from '../screens/TanodScreen';
 import { AuthStackParamList, AppStackParamList } from '../types';
@@ -46,6 +47,7 @@ function AppNavigator() {
     <AppStack.Navigator screenOptions={{ headerShown: false }}>
       <AppStack.Screen name="Home" component={HomeScreen} />
       <AppStack.Screen name="Alert" component={AlertScreen} />
+      <AppStack.Screen name="ResponderLocations" component={ResponderLocationsScreen} />
       <AppStack.Screen name="Official" component={OfficialScreen} />
       <AppStack.Screen name="Tanod" component={TanodScreen} />
       <AppStack.Screen name="Responder" component={TanodScreen} />

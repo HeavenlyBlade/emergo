@@ -20,8 +20,6 @@ import {
   runTransaction,
   updateDoc,
   where,
-  orderBy,
-  limit,
   serverTimestamp,
   GeoPoint,
   Timestamp,
@@ -48,19 +46,22 @@ export async function submitEmergencyAlert(
   // and the caller (AlertScreen) will display the error to the user.
 
   // H4 fix: rate limit — prevent submitting more than one alert every 5 minutes
-  const fiveMinutesAgo = Timestamp.fromDate(
-    new Date(Date.now() - 5 * 60 * 1000)
-  );
+  // Query by reportedBy only (single-field index) and filter in JS so it never
+  // fails with a missing composite index error.
+  const fiveMinutesAgoMs = Date.now() - 5 * 60 * 1000;
   const recentQuery = query(
     collection(db, 'incidents'),
-    where('reportedBy', '==', uid),
-    where('reportedAt', '>', fiveMinutesAgo),
-    limit(1)
+    where('reportedBy', '==', uid)
   );
   const recentSnap = await getDocs(recentQuery);
-  if (!recentSnap.empty) {
-    const lastAlert = recentSnap.docs[0].data();
-    const reportedAt = (lastAlert.reportedAt as Timestamp).toDate();
+  const recentAlert = recentSnap.docs
+    .map((d: any) => d.data())
+    .find((data: any) => {
+      const ts = data.reportedAt as Timestamp | undefined;
+      return ts && typeof ts.toDate === 'function' && ts.toDate().getTime() > fiveMinutesAgoMs;
+    });
+  if (recentAlert) {
+    const reportedAt = (recentAlert.reportedAt as Timestamp).toDate();
     const secondsLeft = Math.ceil((reportedAt.getTime() + 5 * 60 * 1000 - Date.now()) / 1000);
     const minutes = Math.floor(secondsLeft / 60);
     const seconds = secondsLeft % 60;
@@ -102,19 +103,26 @@ export function subscribeToMyIncidents(
   uid: string,
   callback: (incidents: IncidentDocument[]) => void
 ): Unsubscribe {
+  // Query by reportedBy only (single-field index) and sort client-side
+  // so the real-time listener never fails due to a missing composite index.
   const q = query(
     collection(db, 'incidents'),
-    where('reportedBy', '==', uid),
-    orderBy('reportedAt', 'desc')
+    where('reportedBy', '==', uid)
   );
 
   return onSnapshot(
     q,
     (snap) => {
-      const incidents = snap.docs.map((d: any) => ({
-        id: d.id,
-        ...d.data(),
-      })) as IncidentDocument[];
+      const incidents = snap.docs
+        .map((d: any) => ({
+          id: d.id,
+          ...d.data(),
+        }))
+        .sort((a: IncidentDocument, b: IncidentDocument) => {
+          const aMs = (a.reportedAt as Timestamp | undefined)?.toMillis?.() ?? Date.now();
+          const bMs = (b.reportedAt as Timestamp | undefined)?.toMillis?.() ?? Date.now();
+          return bMs - aMs;
+        }) as IncidentDocument[];
       callback(incidents);
     },
     (err) => {

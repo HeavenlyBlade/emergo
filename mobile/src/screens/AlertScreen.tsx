@@ -25,6 +25,8 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
 import { Timestamp } from 'firebase/firestore';
@@ -36,10 +38,8 @@ import {
   STATUS_LABELS,
   formatRelativeTime,
   formatResponseTime,
-  calculateDistanceMeters,
-  formatDistance,
 } from '../utils/incidentUtils';
-import type { IncidentDocument } from '../types';
+import type { AppStackParamList, IncidentDocument } from '../types';
 
 type Severity = 'light' | 'moderate' | 'extreme';
 
@@ -50,6 +50,7 @@ const SEVERITY_OPTIONS: { value: Severity; label: string; color: string; bg: str
 ];
 
 export default function AlertScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList, 'Alert'>>();
   const { uid, userDoc } = useAuth();
   const { coords, loading: locationLoading, error: locationError } = useLocation();
   const [submitting, setSubmitting] = useState(false);
@@ -58,10 +59,11 @@ export default function AlertScreen() {
   const [severity, setSeverity] = useState<Severity>('moderate');
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [chipExpanded, setChipExpanded] = useState(false);
   const [notifModalVisible, setNotifModalVisible] = useState(false);
   const [readNotifIds, setReadNotifIds] = useState<string[]>([]);
   const prevStatusMapRef = useRef<Record<string, string>>({});
+  const notifiedIdsRef = useRef<Set<string>>(new Set());
+  const notifiedLoadedRef = useRef<Promise<void> | null>(null);
   const initialLoadDoneRef = useRef(false);
 
   // ─── Request notification permission on mount ────────────────────────────
@@ -75,9 +77,19 @@ export default function AlertScreen() {
 
   useEffect(() => {
     if (!uid) return;
+    initialLoadDoneRef.current = false;
+    prevStatusMapRef.current = {};
 
-    // Load which incidents we've already shown a notification for (separate from "read" bell)
     const NOTIFIED_KEY = `emergo_notified_verifs_${uid}`;
+
+    notifiedLoadedRef.current = AsyncStorage.getItem(NOTIFIED_KEY)
+      .then((raw) => {
+        const parsed: string[] = raw ? JSON.parse(raw) : [];
+        notifiedIdsRef.current = new Set(parsed);
+      })
+      .catch(() => {
+        notifiedIdsRef.current = new Set();
+      });
 
     AsyncStorage.getItem(`emergo_read_verifs_${uid}`)
       .then((raw) => {
@@ -85,77 +97,64 @@ export default function AlertScreen() {
       })
       .catch(() => {});
 
+    const fireVerifiedNotification = (inc: IncidentDocument) => {
+      Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Emergency Alert Verified',
+          body:
+            inc.adminMessage ||
+            'Your emergency has been received and verified. Responders will arrive shortly.',
+          sound: 'default',
+          data: { incidentId: inc.id, type: 'verified' },
+        },
+        trigger:
+          Platform.OS === 'android'
+            ? ({ channelId: 'emergency-alerts' } as any)
+            : null,
+      }).catch((err) => {
+        console.warn('[AlertScreen] Local notification failed:', err);
+      });
+    };
+
     const unsub = subscribeToMyIncidents(uid, async (list) => {
-      // ── Cold-start check: fire notifications for verified incidents
-      //    that happened while the app was closed / in background.
-      //    We track which incident IDs we've already notified about in
-      //    AsyncStorage so we don't double-notify on subsequent snapshots.
-      if (!initialLoadDoneRef.current) {
-        try {
-          const raw = await AsyncStorage.getItem(NOTIFIED_KEY);
-          const alreadyNotified: string[] = raw ? JSON.parse(raw) : [];
-          const newlyNotified: string[] = [];
+      const isInitialSnapshot = !initialLoadDoneRef.current;
+      initialLoadDoneRef.current = true;
 
-          for (const inc of list) {
-            if (inc.status === 'verified' && !alreadyNotified.includes(inc.id)) {
-              newlyNotified.push(inc.id);
-              Notifications.scheduleNotificationAsync({
-                content: {
-                  title: 'Emergency Alert Verified',
-                  body:
-                    inc.adminMessage ||
-                    'Your emergency has been received and verified. Responders will arrive shortly.',
-                  sound: 'default',
-                  data: { incidentId: inc.id, type: 'verified' },
-                },
-                trigger: null,
-              }).catch(() => {});
-            }
-          }
+      if (notifiedLoadedRef.current) {
+        await notifiedLoadedRef.current;
+      }
 
-          if (newlyNotified.length > 0) {
-            const updated = [...alreadyNotified, ...newlyNotified];
-            AsyncStorage.setItem(NOTIFIED_KEY, JSON.stringify(updated)).catch(() => {});
-          }
-        } catch {
-          // ignore storage errors
+      let notifiedChanged = false;
+
+      for (const inc of list) {
+        const prevStatus = prevStatusMapRef.current[inc.id];
+        const shouldNotifyColdStart =
+          isInitialSnapshot &&
+          inc.status === 'verified' &&
+          !notifiedIdsRef.current.has(inc.id);
+        const shouldNotifyLive =
+          !isInitialSnapshot &&
+          inc.status === 'verified' &&
+          prevStatus !== 'verified' &&
+          !notifiedIdsRef.current.has(inc.id);
+
+        if (shouldNotifyColdStart || shouldNotifyLive) {
+          notifiedIdsRef.current.add(inc.id);
+          notifiedChanged = true;
+          fireVerifiedNotification(inc);
         }
       }
 
-      // ── Foreground check: detect live status transitions (app open)
-      if (initialLoadDoneRef.current) {
-        const rawNotified = await AsyncStorage.getItem(NOTIFIED_KEY).catch(() => null);
-        const alreadyNotified: string[] = rawNotified ? JSON.parse(rawNotified) : [];
-
-        for (const inc of list) {
-          const prevStatus = prevStatusMapRef.current[inc.id];
-          if (
-            inc.status === 'verified' &&
-            prevStatus &&
-            prevStatus !== 'verified' &&
-            !alreadyNotified.includes(inc.id)
-          ) {
-            Notifications.scheduleNotificationAsync({
-              content: {
-                title: 'Emergency Alert Verified',
-                body:
-                  inc.adminMessage ||
-                  'Your emergency has been received and verified. Responders will arrive shortly.',
-                sound: 'default',
-                data: { incidentId: inc.id, type: 'verified' },
-              },
-              trigger: null,
-            }).catch(() => {});
-            alreadyNotified.push(inc.id);
-            AsyncStorage.setItem(NOTIFIED_KEY, JSON.stringify(alreadyNotified)).catch(() => {});
-          }
-        }
+      if (notifiedChanged) {
+        AsyncStorage.setItem(
+          NOTIFIED_KEY,
+          JSON.stringify(Array.from(notifiedIdsRef.current))
+        ).catch(() => {});
       }
 
       const nextMap: Record<string, string> = {};
       for (const inc of list) nextMap[inc.id] = inc.status;
       prevStatusMapRef.current = nextMap;
-      initialLoadDoneRef.current = true;
       setIncidents(list);
     });
     return () => unsub();
@@ -177,22 +176,6 @@ export default function AlertScreen() {
 
   // Active / most recent alert
   const activeIncident = incidents.find((i) => i.status !== 'resolved') ?? incidents[0];
-  const respondersOnTheWay = activeIncident?.respondersOnTheWay ?? [];
-  const responderCount = respondersOnTheWay.length;
-
-  const closestDistance =
-    responderCount > 0 && (activeIncident?.location || coords)
-      ? Math.min(
-          ...respondersOnTheWay.map((r) =>
-            calculateDistanceMeters(
-              r.latitude,
-              r.longitude,
-              activeIncident?.location?.latitude ?? coords!.latitude,
-              activeIncident?.location?.longitude ?? coords!.longitude
-            )
-          )
-        )
-      : null;
 
   const handleOpenMaps = () => {
     if (!coords) return;
@@ -327,22 +310,18 @@ export default function AlertScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Center Upper Section: Responder Indicator Chip & Admin Message */}
+      {/* Center Upper Section: Alert Status, Responder Locations Button & Admin Message */}
       <View style={styles.upperCenterSection}>
-        {/* Responder Chip */}
-        <TouchableOpacity
+        {/* Status Pill */}
+        <View
           style={[
             styles.responderChip,
-            responderCount > 0
-              ? styles.responderChipActive
-              : activeIncident?.status === 'verified'
+            activeIncident?.status === 'verified'
               ? styles.responderChipVerified
               : activeIncident
               ? styles.responderChipPending
               : styles.responderChipStandby,
           ]}
-          onPress={() => responderCount > 0 && setChipExpanded(!chipExpanded)}
-          activeOpacity={responderCount > 0 ? 0.75 : 1}
         >
           <View style={styles.chipInnerRow}>
             <View
@@ -350,9 +329,7 @@ export default function AlertScreen() {
                 styles.chipDot,
                 {
                   backgroundColor:
-                    responderCount > 0
-                      ? '#DC2626'
-                      : activeIncident?.status === 'verified'
+                    activeIncident?.status === 'verified'
                       ? '#10B981'
                       : activeIncident
                       ? '#F59E0B'
@@ -363,51 +340,28 @@ export default function AlertScreen() {
             <Text
               style={[
                 styles.chipText,
-                responderCount > 0
-                  ? styles.chipTextActive
-                  : activeIncident?.status === 'verified'
+                activeIncident?.status === 'verified'
                   ? styles.chipTextVerified
                   : styles.chipTextDefault,
               ]}
             >
-              {responderCount > 0
-                ? `${responderCount} ${responderCount === 1 ? 'Responder' : 'Responders'} on the way · ${closestDistance !== null ? formatDistance(closestDistance) + ' away' : 'en route'}`
-                : activeIncident?.status === 'verified'
+              {activeIncident?.status === 'verified'
                 ? 'Alert Verified · Responders dispatching'
                 : activeIncident
                 ? 'Emergency Alert Sent · Awaiting verification'
                 : 'Emergency Response Active'}
             </Text>
-            {responderCount > 0 && (
-              <Text style={styles.chipChevron}>{chipExpanded ? '▲' : '▼'}</Text>
-            )}
           </View>
-        </TouchableOpacity>
+        </View>
 
-        {/* Expanded Responder details */}
-        {chipExpanded && responderCount > 0 && (
-          <View style={styles.expandedResponderBox}>
-            <Text style={styles.expandedResponderTitle}>Approaching Field Responders:</Text>
-            {respondersOnTheWay.map((r) => {
-              const dist = activeIncident?.location
-                ? calculateDistanceMeters(
-                    r.latitude,
-                    r.longitude,
-                    activeIncident.location.latitude,
-                    activeIncident.location.longitude
-                  )
-                : null;
-              return (
-                <View key={r.uid} style={styles.responderRow}>
-                  <Text style={styles.responderName}>{r.displayName}</Text>
-                  <Text style={styles.responderDistance}>
-                    {dist !== null ? `${formatDistance(dist)} away` : 'On the way'}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        )}
+        {/* Navigate to Responder Locations Screen */}
+        <TouchableOpacity
+          style={styles.viewRespondersBtn}
+          onPress={() => navigation.navigate('ResponderLocations')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.viewRespondersBtnText}>View Responder Locations →</Text>
+        </TouchableOpacity>
 
         {/* Admin Verification Message */}
         {activeIncident?.adminMessage && (
@@ -911,47 +865,19 @@ const styles = StyleSheet.create({
   chipTextDefault: {
     color: '#4B5563',
   },
-  chipChevron: {
-    fontSize: 10,
-    color: '#9CA3AF',
-    marginLeft: 2,
-  },
-  expandedResponderBox: {
+  viewRespondersBtn: {
     width: '100%',
-    backgroundColor: '#FEF2F2',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-    padding: 12,
-    gap: 8,
-  },
-  expandedResponderTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#991B1B',
-    textTransform: 'uppercase',
-  },
-  responderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    backgroundColor: '#1D4ED8',
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
+    justifyContent: 'center',
   },
-  responderName: {
+  viewRespondersBtnText: {
+    color: '#fff',
     fontSize: 13,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  responderDistance: {
-    fontSize: 12,
     fontWeight: '700',
-    color: '#DC2626',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   adminMessageCard: {
     width: '100%',

@@ -91,6 +91,7 @@ export type AuthStackParamList = {
 export type AppStackParamList = {
   Home: undefined;
   Alert: undefined;
+  ResponderLocations: undefined;
   Official: undefined;
   Tanod: undefined;
   Responder: undefined;
